@@ -1,12 +1,12 @@
 {
-	"name": "huggingface-vscode-chat",
+	"name": "lemonade-server",
 	"publisher": "HuggingFace",
 	"displayName": "Hugging Face Provider for GitHub Copilot Chat",
 	"description": "An extension that integrates Hugging Face Inference Providers into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/huggingface/huggingface-vscode-chat"
+		"url": "https://github.com/huggingface/lemonade-server"
 	},
 	"version": "0.0.5",
 	"engines": {
@@ -22,9 +22,9 @@
 	},
 	"badges": [
 		{
-		"url": "https://img.shields.io/github/stars/huggingface/huggingface-vscode-chat?style=social",
-		"description": "Star huggingface-vscode-chat on Github",
-		"href": "https://github.com/huggingface/huggingface-vscode-chat"
+		"url": "https://img.shields.io/github/stars/huggingface/lemonade-server?style=social",
+		"description": "Star lemonade-server on Github",
+		"href": "https://github.com/huggingface/lemonade-server"
 		},
 		{
 		"url": "https://img.shields.io/twitter/follow/huggingface?style=social",
@@ -34,7 +34,7 @@
 	],
 	"homepage": "https://huggingface.co/docs/inference-providers/en/index",
 	"bugs": {
-		"url": "https://github.com/huggingface/huggingface-vscode-chat/issues"
+		"url": "https://github.com/huggingface/lemonade-server/issues"
 	},
 	"license": "MIT",
 	"contributes": {

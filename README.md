@@ -7,7 +7,7 @@ Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code 
 ---
 
 ## ⚡ Quick Start
-1. Install the HF Copilot Chat extension [here](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat).
+1. Install the HF Copilot Chat extension [here](https://marketplace.visualstudio.com/items?itemName=HuggingFace.lemonade-server).
 2. Open VS Code's chat interface.
 3. Click the model picker and click "Manage Models...".
 4. Select "Hugging Face" provider.
@@ -30,8 +30,8 @@ Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code 
 
 ## 🛠️ Development
 ```bash
-git clone https://github.com/huggingface/huggingface-vscode-chat
-cd huggingface-vscode-chat
+git clone https://github.com/huggingface/lemonade-server
+cd lemonade-server
 npm install
 npm run compile
 ```
@@ -52,5 +52,5 @@ Common scripts:
 ---
 
 ## Support & License
-* Open issues: https://github.com/huggingface/huggingface-vscode-chat/issues
+* Open issues: https://github.com/huggingface/lemonade-server/issues
 * License: MIT License Copyright (c) 2025 Hugging Face
