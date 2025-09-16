@@ -1,4 +1,4 @@
-# 🤗 Hugging Face Provider for GitHub Copilot Chat
+# 🍋 Lemonade Server Provider for GitHub Copilot Chat
 
 ## Dev Testing
 ### Install dependencies
@@ -9,39 +9,39 @@ npm run compile
 
 Open this project on VSCode and press F5.
 
-## Original README
+---
 
-![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/inference-providers-guides/demo_vscode.gif)
-
-Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by [Hugging Face Inference Providers](https://huggingface.co/docs/inference-providers/index) 🔥
+Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to your locally running Lemonade server (port 8000) to use the Qwen3-0.6B-GGUF model for code assistance and chat.
 
 ---
 
 ## ⚡ Quick Start
-1. Install the HF Copilot Chat extension [here](https://marketplace.visualstudio.com/items?itemName=HuggingFace.lemonade-server).
-2. Open VS Code's chat interface.
-3. Click the model picker and click "Manage Models...".
-4. Select "Hugging Face" provider.
-5. Provide your Hugging Face Token, you can get one in your [settings page](https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained). You only need to give it the inference.serverless permissions.
-6. Choose the models you want to add to the model picker. 🥳
+1. Make sure your Lemonade server is running on `http://127.0.0.1:8000`
+2. Install the Lemonade Copilot Chat extension
+3. Open VS Code's chat interface
+4. Click the model picker and click "Manage Models..."
+5. Select "Lemonade" provider
+6. If needed, configure a custom server URL using the "Manage Lemonade Provider" command
+7. Start chatting with your local Qwen3-0.6B-GGUF model! 🥳
 
-## ✨ Why use the Hugging Face provider in Copilot
-* Access [SoTA open-source LLMs](https://huggingface.co/models?pipeline_tag=text-generation&inference_provider=cerebras,together,fireworks-ai,nebius,novita,sambanova,groq,hyperbolic,nscale,fal-ai,cohere,replicate,scaleway,black-forest-labs,ovhcloud&sort=trending) with tool calling capabilities.
-* Single API to switch between multiple providers: Cerebras, Cohere, Fireworks AI, Groq, HF Inference, Hyperbolic, Nebius, Novita, Nscale, SambaNova, Together AI, and more. See the full list of partners in the [Inference Providers docs](https://huggingface.co/docs/inference-providers/index#partners).
-* Built for high availability (across providers) and low latency.
-* Transparent pricing: what the provider charges is what you pay.
-
-💡 The free Hugging Face user tier gives you a small amount of monthly inference credits to experiment. Upgrade to [Hugging Face PRO](https://huggingface.co/pro) or [Enterprise](https://huggingface.co/enterprise) for $2 in monthly credits plus pay-as-you-go access across all providers!
+## ✨ Why use the Lemonade provider in Copilot
+* **Privacy**: All processing happens locally on your machine
+* **No API costs**: No external API calls or usage fees
+* **Speed**: Direct connection to your local server
+* **Offline capability**: Works without internet connection
+* **Tool calling**: Supports function calling capabilities
+* **Simple setup**: No API keys required
 
 ---
 
 ## Requirements
-* VS Code 1.104.0 or higher.
-* Hugging Face access token with `inference.serverless` permissions.
+* VS Code 1.104.0 or higher
+* Lemonade server running locally on port 8000 (default)
+* Qwen3-0.6B-GGUF model loaded in your Lemonade server
 
 ## 🛠️ Development
 ```bash
-git clone https://github.com/huggingface/lemonade-server
+git clone https://github.com/lemonade/lemonade-server
 cd lemonade-server
 npm install
 npm run compile
@@ -54,14 +54,18 @@ Common scripts:
 * Lint: `npm run lint`
 * Format: `npm run format`
 
----
+## 🔧 Configuration
+The extension connects to `http://127.0.0.1:8000/api/v1` by default. You can change this by:
+1. Opening VS Code Command Palette (Ctrl+Shift+P)
+2. Running "Manage Lemonade Provider" command
+3. Entering your custom Lemonade server URL
 
 ## 📚 Learn more
-* Inference Providers documentation: https://huggingface.co/docs/inference-providers/index
+* Lemonade Server: Set up your local LLM server
 * VS Code Chat Provider API: https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider
 
 ---
 
 ## Support & License
-* Open issues: https://github.com/huggingface/lemonade-server/issues
-* License: MIT License Copyright (c) 2025 Hugging Face
+* Open issues: https://github.com/lemonade/lemonade-server/issues
+* License: MIT License Copyright (c) 2025 Lemonade

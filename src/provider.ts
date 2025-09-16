@@ -9,18 +9,18 @@ import {
 	Progress,
 } from "vscode";
 
-import type { HFModelItem, HFModelsResponse } from "./types";
-
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
 
-const BASE_URL = "https://router.huggingface.co/v1";
+const DEFAULT_BASE_URL = "http://127.0.0.1:8000/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
+const HARDCODED_API_KEY = "lemonade";
+const HARDCODED_MODEL = "Qwen3-0.6B-GGUF";
 
 /**
- * VS Code Chat provider backed by Hugging Face Inference Providers.
+ * VS Code Chat provider backed by Lemonade local LLM server.
  */
-export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
+export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	private _chatEndpoints: { model: string; modelMaxPromptTokens: number }[] = [];
 	/** Buffer for assembling streamed tool calls by index. */
 	private _toolCallBuffers: Map<number, { id?: string; name?: string; args: string }> = new Map<
@@ -51,7 +51,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private _emittedTextToolCallIds = new Set<string>();
 
 	/**
-	 * Create a provider using the given secret storage for the API key.
+	 * Create a provider using the given secret storage for the server URL.
 	 * @param secrets VS Code secret storage.
 	 */
 	constructor(private readonly secrets: vscode.SecretStorage, private readonly userAgent: string) {}
@@ -90,63 +90,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		const apiKey = await this.ensureApiKey(options.silent);
-		if (!apiKey) {
-			return [];
-		}
+		// Return hardcoded model info for Qwen3-0.6B-GGUF
+		const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
+		const maxInput = Math.max(1, DEFAULT_CONTEXT_LENGTH - maxOutput);
 
-		const { models } = await this.fetchModels(apiKey);
-
-		const infos: LanguageModelChatInformation[] = models.flatMap((m) => {
-			const providers = m?.providers ?? [];
-			const modalities = m.architecture?.input_modalities ?? [];
-			const vision = Array.isArray(modalities) && modalities.includes("image");
-
-			// Build entries for all providers that support tool calling
-			const toolProviders = providers.filter((p) => p.supports_tools === true);
-			const entries: LanguageModelChatInformation[] = [];
-
-			for (const p of toolProviders) {
-				const contextLen = p?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-				const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
-				const maxInput = Math.max(1, contextLen - maxOutput);
-				entries.push({
-					id: `${m.id}:${p.provider}`,
-					name: `${m.id} via ${p.provider}`,
-					tooltip: `Hugging Face via ${p.provider}`,
-					family: "huggingface",
-					version: "1.0.0",
-					maxInputTokens: maxInput,
-					maxOutputTokens: maxOutput,
-					capabilities: {
-						toolCalling: true,
-						imageInput: vision,
-					},
-				} satisfies LanguageModelChatInformation);
-			}
-
-			if (entries.length === 0 && providers.length > 0) {
-				const base = providers[0];
-				const contextLen = base?.context_length ?? DEFAULT_CONTEXT_LENGTH;
-				const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
-				const maxInput = Math.max(1, contextLen - maxOutput);
-				entries.push({
-					id: m.id,
-					name: m.id,
-					tooltip: "Hugging Face",
-					family: "huggingface",
-					version: "1.0.0",
-					maxInputTokens: maxInput,
-					maxOutputTokens: maxOutput,
-					capabilities: {
-						toolCalling: false,
-						imageInput: vision,
-					},
-				} satisfies LanguageModelChatInformation);
-			}
-
-			return entries;
-		});
+		const infos: LanguageModelChatInformation[] = [{
+			id: HARDCODED_MODEL,
+			name: HARDCODED_MODEL,
+			tooltip: "Lemonade Local LLM",
+			family: "lemonade",
+			version: "1.0.0",
+			maxInputTokens: maxInput,
+			maxOutputTokens: maxOutput,
+			capabilities: {
+				toolCalling: true,
+				imageInput: false,
+			},
+		} satisfies LanguageModelChatInformation];
 
 		this._chatEndpoints = infos.map((info) => ({
 			model: info.id,
@@ -164,42 +124,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
-	 * Fetch the list of models and supplementary metadata from Hugging Face.
-	 * @param apiKey The HF API key used to authenticate.
+	 * Get the configured server URL or return the default.
 	 */
-	private async fetchModels(
-		apiKey: string
-	): Promise<{ models: HFModelItem[] }> {
-			const modelsList = (async () => {
-				const resp = await fetch(`${BASE_URL}/models`, {
-					method: "GET",
-					headers: { Authorization: `Bearer ${apiKey}`, "User-Agent": this.userAgent },
-				});
-				if (!resp.ok) {
-					let text = "";
-					try {
-						text = await resp.text();
-					} catch (error) {
-						console.error("[Hugging Face Model Provider] Failed to read response text", error);
-					}
-					const err = new Error(
-						`Failed to fetch Hugging Face models: ${resp.status} ${resp.statusText}${text ? `\n${text}` : ""}`
-					);
-					console.error("[Hugging Face Model Provider] Failed to fetch Hugging Face models", err);
-					throw err;
-				}
-				const parsed = (await resp.json()) as HFModelsResponse;
-				return parsed.data ?? [];
-			})();
-
-			try {
-				const models = await modelsList;
-				return { models };
-			} catch (err) {
-				console.error("[Hugging Face Model Provider] Failed to fetch Hugging Face models", err);
-				throw err;
-			}
-		}
+	private async getServerUrl(): Promise<string> {
+		const stored = await this.secrets.get("lemonade.serverUrl");
+		return stored || DEFAULT_BASE_URL;
+	}
 
 	/**
 	 * Returns the response for a chat request, passing the results to the progress callback.
@@ -235,7 +165,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				try {
 					progress.report(part);
 				} catch (e) {
-					console.error("[Hugging Face Model Provider] Progress.report failed", {
+					console.error("[Lemonade Model Provider] Progress.report failed", {
 						modelId: model.id,
 						error: e instanceof Error ? { name: e.name, message: e.message } : String(e),
 					});
@@ -243,10 +173,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			},
 		};
 		try {
-			const apiKey = await this.ensureApiKey(true);
-			if (!apiKey) {
-				throw new Error("Hugging Face API key not found");
-			}
+			const baseUrl = await this.getServerUrl();
 
             const openaiMessages = convertMessages(messages);
 
@@ -294,10 +221,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (toolConfig.tool_choice) {
 				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
 			}
-			const response = await fetch(`${BASE_URL}/chat/completions`, {
+			const response = await fetch(`${baseUrl}/chat/completions`, {
                 method: "POST",
                 headers: {
-                    Authorization: `Bearer ${apiKey}`,
+                    Authorization: `Bearer ${HARDCODED_API_KEY}`,
                     "Content-Type": "application/json",
 					"User-Agent": this.userAgent,
                 },
@@ -306,18 +233,18 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error("[Hugging Face Model Provider] HF API error response", errorText);
+				console.error("[Lemonade Model Provider] API error response", errorText);
 				throw new Error(
-					`Hugging Face API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
+					`Lemonade API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
 				);
 			}
 
 			if (!response.body) {
-				throw new Error("No response body from Hugging Face API");
+				throw new Error("No response body from Lemonade API");
 			}
 			await this.processStreamingResponse(response.body, trackingProgress, token);
 		} catch (err) {
-			console.error("[Hugging Face Model Provider] Chat request failed", {
+			console.error("[Lemonade Model Provider] Chat request failed", {
 				modelId: model.id,
 				messageCount: messages.length,
 				error: err instanceof Error ? { name: err.name, message: err.message } : String(err),
@@ -351,29 +278,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		}
 	}
 
-	/**
-	 * Ensure an API key exists in SecretStorage, optionally prompting the user when not silent.
-	 * @param silent If true, do not prompt the user.
-	 */
-	private async ensureApiKey(silent: boolean): Promise<string | undefined> {
-		let apiKey = await this.secrets.get("huggingface.apiKey");
-		if (!apiKey && !silent) {
-			const entered = await vscode.window.showInputBox({
-				title: "Hugging Face API Key",
-				prompt: "Enter your Hugging Face API key",
-				ignoreFocusOut: true,
-				password: true,
-			});
-			if (entered && entered.trim()) {
-				apiKey = entered.trim();
-				await this.secrets.store("huggingface.apiKey", apiKey);
-			}
-		}
-		return apiKey;
-	}
 
 	/**
-	 * Read and parse the HF Router streaming (SSE-like) response and report parts.
+	 * Read and parse the Lemonade server streaming (SSE-like) response and report parts.
 	 * @param responseBody The readable stream body.
 	 * @param progress Progress reporter for streamed parts.
 	 * @param token Cancellation token.
@@ -748,7 +655,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
             const parsed = tryParseJSONObject(buf.args);
             if (!parsed.ok) {
                 if (throwOnInvalid) {
-                    console.error("[Hugging Face Model Provider] Invalid JSON for tool call", { idx, snippet: (buf.args || "").slice(0, 200) });
+                    console.error("[Lemonade Model Provider] Invalid JSON for tool call", { idx, snippet: (buf.args || "").slice(0, 200) });
                     throw new Error("Invalid JSON for tool call");
                 }
                 // When not throwing (e.g. on [DONE]), drop silently to reduce noise

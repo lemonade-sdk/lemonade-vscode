@@ -1,6 +1,6 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
-import { HuggingFaceChatModelProvider } from "../provider";
+import { LemonadeChatModelProvider } from "../provider";
 import { convertMessages, convertTools, validateRequest, validateTools, tryParseJSONObject } from "../utils";
 
 interface OpenAIToolCall {
@@ -16,10 +16,10 @@ interface ConvertedMessage {
 	tool_call_id?: string;
 }
 
-suite("HuggingFace Chat Provider Extension", () => {
+suite("Lemonade Chat Provider Extension", () => {
 	suite("provider", () => {
-		test("prepareLanguageModelChatInformation returns array (no key -> empty)", async () => {
-			const provider = new HuggingFaceChatModelProvider({
+		test("prepareLanguageModelChatInformation returns array", async () => {
+			const provider = new LemonadeChatModelProvider({
 				get: async () => undefined,
 				store: async () => {},
 				delete: async () => {},
@@ -34,7 +34,7 @@ suite("HuggingFace Chat Provider Extension", () => {
 		});
 
 		test("provideTokenCount counts simple string", async () => {
-			const provider = new HuggingFaceChatModelProvider({
+			const provider = new LemonadeChatModelProvider({
 				get: async () => undefined,
 				store: async () => {},
 				delete: async () => {},
@@ -45,7 +45,7 @@ suite("HuggingFace Chat Provider Extension", () => {
 				{
 					id: "m",
 					name: "m",
-					family: "huggingface",
+					family: "lemonade",
 					version: "1.0.0",
 					maxInputTokens: 1000,
 					maxOutputTokens: 1000,
@@ -59,7 +59,7 @@ suite("HuggingFace Chat Provider Extension", () => {
 		});
 
 		test("provideTokenCount counts message parts", async () => {
-			const provider = new HuggingFaceChatModelProvider({
+			const provider = new LemonadeChatModelProvider({
 				get: async () => undefined,
 				store: async () => {},
 				delete: async () => {},
@@ -75,7 +75,7 @@ suite("HuggingFace Chat Provider Extension", () => {
 				{
 					id: "m",
 					name: "m",
-					family: "huggingface",
+					family: "lemonade",
 					version: "1.0.0",
 					maxInputTokens: 1000,
 					maxOutputTokens: 1000,
@@ -88,21 +88,23 @@ suite("HuggingFace Chat Provider Extension", () => {
 			assert.ok(est > 0);
 		});
 
-		test("provideLanguageModelChatResponse throws without API key", async () => {
-			const provider = new HuggingFaceChatModelProvider({
+		test("provideLanguageModelChatResponse works without API key", async () => {
+			const provider = new LemonadeChatModelProvider({
 				get: async () => undefined,
 				store: async () => {},
 				delete: async () => {},
 				onDidChange: (_listener: unknown) => ({ dispose() {} }),
 			} as unknown as vscode.SecretStorage, "GitHubCopilotChat/test VSCode/test");
 
+			// This should not throw since Lemonade doesn't require API keys
+			// However, it will still fail due to no server running, which is expected
 			let threw = false;
 			try {
 				await provider.provideLanguageModelChatResponse(
 					{
 						id: "m",
 						name: "m",
-						family: "huggingface",
+						family: "lemonade",
 						version: "1.0.0",
 						maxInputTokens: 1000,
 						maxOutputTokens: 1000,
@@ -113,10 +115,13 @@ suite("HuggingFace Chat Provider Extension", () => {
 					{ report: () => {} },
 					new vscode.CancellationTokenSource().token
 				);
-			} catch {
+			} catch (error) {
+				// Should throw due to connection error, not missing API key
 				threw = true;
+				const errMsg = error instanceof Error ? error.message : String(error);
+				assert.ok(!errMsg.includes("API key"), "Should not fail due to API key");
 			}
-			assert.ok(threw);
+			assert.ok(threw, "Should throw due to connection error");
 		});
 	});
 

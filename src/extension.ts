@@ -1,39 +1,39 @@
 import * as vscode from "vscode";
-import { HuggingFaceChatModelProvider } from "./provider";
+import { LemonadeChatModelProvider } from "./provider";
 
 export function activate(context: vscode.ExtensionContext) {
 	// Build a descriptive User-Agent to help quantify API usage
-	const ext = vscode.extensions.getExtension("HuggingFace.lemonade-server");
+	const ext = vscode.extensions.getExtension("Lemonade.lemonade-server");
 	const extVersion = ext?.packageJSON?.version ?? "unknown";
 	const vscodeVersion = vscode.version;
 	// Keep UA minimal: only extension version and VS Code version
 	const ua = `lemonade-server/${extVersion} VSCode/${vscodeVersion}`;
 
-	const provider = new HuggingFaceChatModelProvider(context.secrets, ua);
-	// Register the Hugging Face provider under the vendor id used in package.json
-	vscode.lm.registerLanguageModelChatProvider("huggingface", provider);
+	const provider = new LemonadeChatModelProvider(context.secrets, ua);
+	// Register the Lemonade provider under the vendor id used in package.json
+	vscode.lm.registerLanguageModelChatProvider("lemonade", provider);
 
-	// Management command to configure API key
+	// Management command to configure server settings (no API key needed for local server)
 	context.subscriptions.push(
-		vscode.commands.registerCommand("huggingface.manage", async () => {
-			const existing = await context.secrets.get("huggingface.apiKey");
-			const apiKey = await vscode.window.showInputBox({
-				title: "Hugging Face API Key",
-				prompt: existing ? "Update your Hugging Face API key" : "Enter your Hugging Face API key",
+		vscode.commands.registerCommand("lemonade.manage", async () => {
+			const existing = await context.secrets.get("lemonade.serverUrl");
+			const defaultUrl = "http://127.0.0.1:8000/api/v1";
+			const serverUrl = await vscode.window.showInputBox({
+				title: "Lemonade Server URL",
+				prompt: existing ? "Update your Lemonade server URL" : "Enter your Lemonade server URL",
 				ignoreFocusOut: true,
-				password: true,
-				value: existing ?? "",
+				value: existing ?? defaultUrl,
 			});
-			if (apiKey === undefined) {
+			if (serverUrl === undefined) {
 				return; // user canceled
 			}
-			if (!apiKey.trim()) {
-				await context.secrets.delete("huggingface.apiKey");
-				vscode.window.showInformationMessage("Hugging Face API key cleared.");
+			if (!serverUrl.trim()) {
+				await context.secrets.delete("lemonade.serverUrl");
+				vscode.window.showInformationMessage("Lemonade server URL reset to default.");
 				return;
 			}
-			await context.secrets.store("huggingface.apiKey", apiKey.trim());
-			vscode.window.showInformationMessage("Hugging Face API key saved.");
+			await context.secrets.store("lemonade.serverUrl", serverUrl.trim());
+			vscode.window.showInformationMessage("Lemonade server URL saved.");
 		})
 	);
 }

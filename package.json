@@ -1,12 +1,12 @@
 {
 	"name": "lemonade-server",
-	"publisher": "HuggingFace",
-	"displayName": "Hugging Face Provider for GitHub Copilot Chat",
-	"description": "An extension that integrates Hugging Face Inference Providers into GitHub Copilot Chat",
+	"publisher": "Lemonade",
+	"displayName": "Lemonade Server Provider for GitHub Copilot Chat",
+	"description": "An extension that integrates Lemonade local LLM server into GitHub Copilot Chat",
 	"icon": "assets/logo.png",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/huggingface/lemonade-server"
+		"url": "https://github.com/lemonade/lemonade-server"
 	},
 	"version": "0.0.5",
 	"engines": {
@@ -22,33 +22,28 @@
 	},
 	"badges": [
 		{
-		"url": "https://img.shields.io/github/stars/huggingface/lemonade-server?style=social",
+		"url": "https://img.shields.io/github/stars/lemonade/lemonade-server?style=social",
 		"description": "Star lemonade-server on Github",
-		"href": "https://github.com/huggingface/lemonade-server"
-		},
-		{
-		"url": "https://img.shields.io/twitter/follow/huggingface?style=social",
-		"description": "Follow Hugging Face on Twitter",
-		"href": "https://x.com/huggingface"
+		"href": "https://github.com/lemonade/lemonade-server"
 		}
 	],
-	"homepage": "https://huggingface.co/docs/inference-providers/en/index",
+	"homepage": "https://github.com/lemonade/lemonade-server",
 	"bugs": {
-		"url": "https://github.com/huggingface/lemonade-server/issues"
+		"url": "https://github.com/lemonade/lemonade-server/issues"
 	},
 	"license": "MIT",
 	"contributes": {
 		"languageModelChatProviders": [
 			{
-				"vendor": "huggingface",
-				"displayName": "Hugging Face",
-				"managementCommand": "huggingface.manage"
+				"vendor": "lemonade",
+				"displayName": "Lemonade",
+				"managementCommand": "lemonade.manage"
 			}
 		],
 		"commands": [
 			{
-				"command": "huggingface.manage",
-				"title": "Manage Hugging Face Provider"
+				"command": "lemonade.manage",
+				"title": "Manage Lemonade Provider"
 			}
 		]
 	},
