@@ -11,7 +11,7 @@ Open this project on VSCode and press F5.
 
 ---
 
-Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to your locally running Lemonade server (port 8000) to use the Qwen3-0.6B-GGUF model for code assistance and chat.
+Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to your locally running Lemonade server (port 8000) to use local LLM models for code assistance and chat.
 
 ---
 
@@ -22,7 +22,8 @@ Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to 
 4. Click the model picker and click "Manage Models..."
 5. Select "Lemonade" provider
 6. If needed, configure a custom server URL using the "Manage Lemonade Provider" command
-7. Start chatting with your local Qwen3-0.6B-GGUF model! 🥳
+7. Select from available models (Qwen3-0.6B-GGUF, Qwen3-30B-A3B-Instruct-2507-GGUF)
+8. Start chatting with your local LLM models! 🥳
 
 ## ✨ Why use the Lemonade provider in Copilot
 * **Privacy**: All processing happens locally on your machine
@@ -37,7 +38,9 @@ Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to 
 ## Requirements
 * VS Code 1.104.0 or higher
 * Lemonade server running locally on port 8000 (default)
-* Qwen3-0.6B-GGUF model loaded in your Lemonade server
+* One or more supported models loaded in your Lemonade server:
+  - Qwen3-0.6B-GGUF
+  - Qwen3-30B-A3B-Instruct-2507-GGUF
 
 ## 🛠️ Development
 ```bash

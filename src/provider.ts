@@ -15,7 +15,11 @@ const DEFAULT_BASE_URL = "http://127.0.0.1:8000/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const HARDCODED_API_KEY = "lemonade";
-const HARDCODED_MODEL = "Qwen3-0.6B-GGUF";
+// Add new models here as they become available in your Lemonade server
+const AVAILABLE_MODELS = [
+	"Qwen3-0.6B-GGUF",
+	"Qwen3-30B-A3B-Instruct-2507-GGUF"
+];
 
 /**
  * VS Code Chat provider backed by Lemonade local LLM server.
@@ -90,13 +94,13 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		// Return hardcoded model info for Qwen3-0.6B-GGUF
+		// Return model info for all available Lemonade models
 		const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
 		const maxInput = Math.max(1, DEFAULT_CONTEXT_LENGTH - maxOutput);
 
-		const infos: LanguageModelChatInformation[] = [{
-			id: HARDCODED_MODEL,
-			name: HARDCODED_MODEL,
+		const infos: LanguageModelChatInformation[] = AVAILABLE_MODELS.map(modelId => ({
+			id: modelId,
+			name: modelId,
 			tooltip: "Lemonade Local LLM",
 			family: "lemonade",
 			version: "1.0.0",
@@ -106,7 +110,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 				toolCalling: true,
 				imageInput: false,
 			},
-		} satisfies LanguageModelChatInformation];
+		} satisfies LanguageModelChatInformation));
 
 		this._chatEndpoints = infos.map((info) => ({
 			model: info.id,
