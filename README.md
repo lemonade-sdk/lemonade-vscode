@@ -1,5 +1,16 @@
 # 🤗 Hugging Face Provider for GitHub Copilot Chat
 
+## Dev Testing
+### Install dependencies
+npm install
+
+### Compile the TypeScript code
+npm run compile
+
+Open this project on VSCode and press F5.
+
+## Original README
+
 ![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/inference-providers-guides/demo_vscode.gif)
 
 Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by [Hugging Face Inference Providers](https://huggingface.co/docs/inference-providers/index) 🔥
