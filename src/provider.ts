@@ -233,7 +233,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
             const toolTokenCount = this.estimateToolTokens(toolConfig.tools);
             const tokenLimit = Math.max(1, model.maxInputTokens);
             if (inputTokenCount + toolTokenCount > tokenLimit) {
-                console.error("[Hugging Face Model Provider] Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
+                console.error("[Lemonade Provider] Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
                 throw new Error("Message exceeds token limit.");
             }
 
