@@ -10,16 +10,12 @@ import {
 } from "vscode";
 
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
+import type { LemonadeModel, LemonadeModelsResponse } from "./types";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8000/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const HARDCODED_API_KEY = "lemonade";
-// Add new models here as they become available in your Lemonade server
-const AVAILABLE_MODELS = [
-	"Qwen3-0.6B-GGUF",
-	"Qwen3-30B-A3B-Instruct-2507-GGUF"
-];
 
 /**
  * VS Code Chat provider backed by Lemonade local LLM server.
@@ -94,13 +90,24 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		// Return model info for all available Lemonade models
+		// Fetch available models from the Lemonade server
+		const models = await this.fetchModels();
+
+		if (models.length === 0) {
+			if (!options.silent) {
+				vscode.window.showWarningMessage(
+					"No models available from Lemonade server. Make sure your server is running and has models loaded."
+				);
+			}
+			return [];
+		}
+
 		const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
 		const maxInput = Math.max(1, DEFAULT_CONTEXT_LENGTH - maxOutput);
 
-		const infos: LanguageModelChatInformation[] = AVAILABLE_MODELS.map(modelId => ({
-			id: modelId,
-			name: modelId,
+		const infos: LanguageModelChatInformation[] = models.map(model => ({
+			id: model.id,
+			name: model.id,
 			tooltip: "Lemonade Local LLM",
 			family: "lemonade",
 			version: "1.0.0",
@@ -133,6 +140,39 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	private async getServerUrl(): Promise<string> {
 		const stored = await this.secrets.get("lemonade.serverUrl");
 		return stored || DEFAULT_BASE_URL;
+	}
+
+	/**
+	 * Fetch the list of available models from the Lemonade server.
+	 */
+	private async fetchModels(): Promise<LemonadeModel[]> {
+		const baseUrl = await this.getServerUrl();
+
+		try {
+			const response = await fetch(`${baseUrl}/models`, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${HARDCODED_API_KEY}`,
+					"User-Agent": this.userAgent,
+				},
+			});
+
+			if (!response.ok) {
+				console.error("[Lemonade Model Provider] Failed to fetch models", {
+					status: response.status,
+					statusText: response.statusText,
+				});
+				throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
+			}
+
+			const data = (await response.json()) as LemonadeModelsResponse;
+			return data.data || [];
+		} catch (error) {
+			console.error("[Lemonade Model Provider] Error fetching models", error);
+			// Return empty array on error - this will result in no models being available
+			// which is better than crashing the extension
+			return [];
+		}
 	}
 
 	/**

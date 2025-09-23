@@ -22,7 +22,7 @@ Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to 
 4. Click the model picker and click "Manage Models..."
 5. Select "Lemonade" provider
 6. If needed, configure a custom server URL using the "Manage Lemonade Provider" command
-7. Select from available models (Qwen3-0.6B-GGUF, Qwen3-30B-A3B-Instruct-2507-GGUF)
+7. Select from any models that are loaded in your Lemonade server (automatically detected)
 8. Start chatting with your local LLM models! 🥳
 
 ## ✨ Why use the Lemonade provider in Copilot
@@ -32,15 +32,15 @@ Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to 
 * **Offline capability**: Works without internet connection
 * **Tool calling**: Supports function calling capabilities
 * **Simple setup**: No API keys required
+* **Dynamic model discovery**: Automatically detects available models from your server
 
 ---
 
 ## Requirements
 * VS Code 1.104.0 or higher
 * Lemonade server running locally on port 8000 (default)
-* One or more supported models loaded in your Lemonade server:
-  - Qwen3-0.6B-GGUF
-  - Qwen3-30B-A3B-Instruct-2507-GGUF
+* One or more models loaded in your Lemonade server (any OpenAI-compatible models)
+* Server must support the `/models` endpoint for model discovery
 
 ## 🛠️ Development
 ```bash

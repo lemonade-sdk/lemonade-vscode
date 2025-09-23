@@ -36,5 +36,23 @@ export interface ToolCallBuffer {
 	args: string;
 }
 
+/**
+ * Model entry from the /models endpoint
+ */
+export interface LemonadeModel {
+	id: string;
+	object: string;
+	created?: number;
+	owned_by?: string;
+}
+
+/**
+ * Response from the /models endpoint
+ */
+export interface LemonadeModelsResponse {
+	object: string;
+	data: LemonadeModel[];
+}
+
 /** OpenAI-style chat roles. */
 export type OpenAIChatRole = "system" | "user" | "assistant" | "tool";
