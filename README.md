@@ -1,21 +1,9 @@
-# 🍋 Lemonade Server Provider for GitHub Copilot Chat
+# 🍋 Lemonade Provider for GitHub Copilot Chat
 
-## Dev Testing
-### Install dependencies
-npm install
 
-### Compile the TypeScript code
-npm run compile
+Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to your locally running Lemonade server to use local LLM models for code assistance and chat.
 
-Open this project on VSCode and press F5.
-
----
-
-Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to your locally running Lemonade server (port 8000) to use local LLM models for code assistance and chat.
-
----
-
-## ⚡ Quick Start
+## 🚀 Getting Started
 1. Make sure your Lemonade server is running on `http://127.0.0.1:8000`
 2. Install the Lemonade Copilot Chat extension
 3. Open VS Code's chat interface
@@ -25,16 +13,14 @@ Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to 
 7. Select from any models that are loaded in your Lemonade server (automatically detected)
 8. Start chatting with your local LLM models! 🥳
 
-## ✨ Why use the Lemonade provider in Copilot
-* **Privacy**: All processing happens locally on your machine
-* **No API costs**: No external API calls or usage fees
-* **Speed**: Direct connection to your local server
-* **Offline capability**: Works without internet connection
-* **Tool calling**: Supports function calling capabilities
+## 🌟 Why Choose Lemonade for Copilot?
+* **🔒 Complete Privacy**: Your code never leaves your machine. Everything stays local and secure
+* **💰 Zero API Costs**: No usage fees, no tokens to buy - just pure local AI power
+* **⚡ Lightning Fast**: Direct connection to your local server means instant responses
+* **🌐 Works Offline**: No internet? No problem! Code assistance anytime, anywhere
+* **🛠️ Advanced Tool Support**: Full function calling capabilities for complex tasks
 * **Simple setup**: No API keys required
 * **Dynamic model discovery**: Automatically detects available models from your server
-
----
 
 ## Requirements
 * VS Code 1.104.0 or higher
@@ -63,12 +49,10 @@ The extension connects to `http://127.0.0.1:8000/api/v1` by default. You can cha
 2. Running "Manage Lemonade Provider" command
 3. Entering your custom Lemonade server URL
 
-## 📚 Learn more
-* Lemonade Server: Set up your local LLM server
-* VS Code Chat Provider API: https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider
-
----
-
 ## Support & License
 * Open issues: https://github.com/lemonade/lemonade-server/issues
 * License: MIT License Copyright (c) 2025 Lemonade
+
+## 🙏 Acknowledgments
+
+This project was originally based on the excellent work by the [Hugging Face team](https://github.com/huggingface/huggingface-vscode-chat). We're grateful for their foundational work.
