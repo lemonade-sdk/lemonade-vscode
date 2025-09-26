@@ -1,4 +1,4 @@
-# 🍋 Lemonade Provider for GitHub Copilot Chat
+# 🍋 Lemonade for GitHub Copilot Chat
 
 
 Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to your locally running Lemonade server to use local LLM models for code assistance and chat.
@@ -28,22 +28,6 @@ Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to 
 * VS Code 1.104.0 or higher
 * Lemonade server 8.1.10 or higher
 
-## 🛠️ Development
-```bash
-git clone https://github.com/lemonade-sdk/lemonade-vscode
-cd lemonade-vscode
-npm install
-npm run compile
-```
-Press F5 to launch an Extension Development Host.
-
-Common scripts:
-* Build: `npm run compile`
-* Watch: `npm run watch`
-* Lint: `npm run lint`
-* Format: `npm run format`
-
-To package the extension, run `npx @vscode/vsce package`. To install the extension, run `code --install-extension lemonade-sdk-0.0.1.vsix`.
 
 ## 🔧 Configuration
 The extension connects to `http://127.0.0.1:8000/api/v1` by default. You can change this by:
