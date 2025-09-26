@@ -1,7 +1,8 @@
 # 🍋 Lemonade for GitHub Copilot Chat
 
+![Demo](assets/demo.gif)
 
-Use your local Lemonade LLM server with VS Code GitHub Copilot Chat! Connect to your locally running Lemonade server to use local LLM models for code assistance and chat.
+Use your local Lemonade LLM server with VS Code GitHub Copilot Chat!
 
 ## 🚀 Getting Started
 1. Make sure your Lemonade server is running
