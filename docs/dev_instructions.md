@@ -15,4 +15,9 @@ Common scripts:
 * Lint: `npm run lint`
 * Format: `npm run format`
 
-To package the extension, run `npx @vscode/vsce package`. To install the extension, run `code --install-extension lemonade-sdk-0.0.1.vsix`.
+To package the extension:
+* `del .\node_modules\`
+* `npm install`
+* `npm run compile`
+* Run `npx @vscode/vsce package`
+* Try it using `code --install-extension lemonade-sdk-0.0.1.vsix`.
