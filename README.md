@@ -1,18 +1,17 @@
-# 🍋 Lemonade for GitHub Copilot Chat
+# 🍋 Lemonade for GitHub Copilot
 
-![Demo](assets/demo.gif)
+![Demo](https://github.com/lemonade-sdk/assets/blob/main/copilot/demo.gif?raw=true)
 
-Use your local Lemonade LLM server with VS Code GitHub Copilot Chat!
+Lemonade allows you to use local LLMs on GitHub Copilot Chat!
 
 ## 🚀 Getting Started
-1. Make sure your Lemonade server is running
+1. Make sure [Lemonade](https://lemonade-server.ai/) is running
     * We recommend setting the context size to at least 32k by using the Lemonade tray or --ctx-size cli option.
-1. Install the Lemonade Copilot Chat extension
-1. Open VS Code's chat interface
-1. Click the model picker and click "Manage Models..."
-1. Select "Lemonade" provider
-1. Select from any models that are loaded in your Lemonade server (automatically detected)
-1. Start chatting with your local LLM models! 🥳
+1. Install the [Lemonade for GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=lemonade-sdk.lemonade-sdk) extension
+1. Open VS Code's chat interface, click the model picker, and click "Manage Models..."
+1. Select "Lemonade" provider and choose a model (Qwen3-Coder-30B is a great start!)
+
+You can now start chatting with your local LLM models! 🥳
 
 > NOTE: If needed, configure a custom server URL using the "Manage Lemonade Provider" command
 
@@ -22,8 +21,6 @@ Use your local Lemonade LLM server with VS Code GitHub Copilot Chat!
 * **⚡ Lightning Fast**: Direct connection to your local server means instant responses
 * **🌐 Works Offline**: No internet? No problem! Code assistance anytime, anywhere
 * **🛠️ Advanced Tool Support**: Full function calling capabilities for complex tasks
-* **Simple setup**: No API keys required
-* **Dynamic model discovery**: Automatically detects available models from your server
 
 ## Requirements
 * VS Code 1.104.0 or higher
