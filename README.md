@@ -32,6 +32,7 @@ The extension connects to `http://localhost:8000/api/v1` by default. You can cha
 1. Opening VS Code Command Palette (Ctrl+Shift+P)
 2. Running "Manage Lemonade Provider" command
 3. Entering your custom Lemonade server URL
+4. Optionally, entering your API key (if your server has `LEMONADE_API_KEY` configured)
 
 ## Support & License
 * Open issues: https://github.com/lemonade-sdk/lemonade/issues
