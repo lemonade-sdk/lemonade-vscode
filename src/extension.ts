@@ -12,16 +12,19 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register the Lemonade provider under the vendor id used in package.json
 	vscode.lm.registerLanguageModelChatProvider("lemonade", provider);
 
-	// Management command to configure server settings (no API key needed for local server)
+	// Management command to configure server settings
 	context.subscriptions.push(
 		vscode.commands.registerCommand("lemonade.manage", async () => {
-			const existing = await context.secrets.get("lemonade.serverUrl");
+			const existingUrl = await context.secrets.get("lemonade.serverUrl");
+			const existingApiKey = await context.secrets.get("lemonade.apiKey");
 			const defaultUrl = "http://localhost:8000/api/v1";
+
+			// Step 1: Server URL configuration
 			const serverUrl = await vscode.window.showInputBox({
 				title: "Lemonade Server URL",
-				prompt: existing ? "Update your Lemonade server URL" : "Enter your Lemonade server URL",
+				prompt: existingUrl ? "Update your Lemonade server URL" : "Enter your Lemonade server URL",
 				ignoreFocusOut: true,
-				value: existing ?? defaultUrl,
+				value: existingUrl ?? defaultUrl,
 			});
 			if (serverUrl === undefined) {
 				return; // user canceled
@@ -32,7 +35,30 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 			await context.secrets.store("lemonade.serverUrl", serverUrl.trim());
-			vscode.window.showInformationMessage("Lemonade server URL saved.");
+
+			// Step 2: API Key configuration (optional)
+			const apiKey = await vscode.window.showInputBox({
+				title: "Lemonade API Key",
+				prompt: existingApiKey
+					? "Update your Lemonade API key (leave empty to reset to default)"
+					: "Enter your Lemonade API key (optional, leave empty to use default)",
+				ignoreFocusOut: true,
+				password: true,
+				value: existingApiKey ?? "",
+				placeHolder: "Leave empty to use default API key",
+			});
+			if (apiKey === undefined) {
+				// User canceled, but URL was already saved
+				vscode.window.showInformationMessage("Lemonade server URL saved. API key unchanged.");
+				return;
+			}
+			if (!apiKey.trim()) {
+				await context.secrets.delete("lemonade.apiKey");
+				vscode.window.showInformationMessage("Lemonade settings saved. API key reset to default.");
+				return;
+			}
+			await context.secrets.store("lemonade.apiKey", apiKey.trim());
+			vscode.window.showInformationMessage("Lemonade settings saved.");
 		})
 	);
 }

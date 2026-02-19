@@ -15,7 +15,7 @@ import type { LemonadeModel, LemonadeModelsResponse } from "./types";
 const DEFAULT_BASE_URL = "http://localhost:8000/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
-const HARDCODED_API_KEY = "lemonade";
+const DEFAULT_API_KEY = "lemonade";
 
 /**
  * VS Code Chat provider backed by Lemonade local LLM server.
@@ -146,16 +146,25 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
+	 * Get the configured API key or return the default.
+	 */
+	private async getApiKey(): Promise<string> {
+		const stored = await this.secrets.get("lemonade.apiKey");
+		return stored || DEFAULT_API_KEY;
+	}
+
+	/**
 	 * Fetch the list of available models from the Lemonade server.
 	 */
 	private async fetchModels(): Promise<LemonadeModel[]> {
 		const baseUrl = await this.getServerUrl();
+		const apiKey = await this.getApiKey();
 
 		try {
 			const response = await fetch(`${baseUrl}/models`, {
 				method: "GET",
 				headers: {
-					Authorization: `Bearer ${HARDCODED_API_KEY}`,
+					Authorization: `Bearer ${apiKey}`,
 					"User-Agent": this.userAgent,
 				},
 			});
@@ -221,6 +230,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		};
 		try {
 			const baseUrl = await this.getServerUrl();
+			const apiKey = await this.getApiKey();
 
             const openaiMessages = convertMessages(messages);
 
@@ -271,7 +281,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			const response = await fetch(`${baseUrl}/chat/completions`, {
                 method: "POST",
                 headers: {
-                    Authorization: `Bearer ${HARDCODED_API_KEY}`,
+                    Authorization: `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
 					"User-Agent": this.userAgent,
                 },
