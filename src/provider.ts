@@ -18,6 +18,22 @@ const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_API_KEY = "lemonade";
 
 /**
+ * Resolve the context length to use. Reads LEMONADE_CTX_SIZE from the
+ * environment; falls back to DEFAULT_CONTEXT_LENGTH when the variable is
+ * absent or not a positive integer.
+ */
+function resolveContextLength(): number {
+	const raw = process.env["LEMONADE_CTX_SIZE"];
+	if (raw) {
+		const parsed = parseInt(raw, 10);
+		if (Number.isFinite(parsed) && parsed > 0) {
+			return parsed;
+		}
+	}
+	return DEFAULT_CONTEXT_LENGTH;
+}
+
+/**
  * VS Code Chat provider backed by Lemonade local LLM server.
  */
 export class LemonadeChatModelProvider implements LanguageModelChatProvider {
@@ -106,7 +122,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		}
 
 		const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
-		const maxInput = Math.max(1, DEFAULT_CONTEXT_LENGTH - maxOutput);
+		const maxInput = Math.max(1, resolveContextLength() - maxOutput);
 
 		const infos: LanguageModelChatInformation[] = models.map(model => ({
 			id: model.id,
