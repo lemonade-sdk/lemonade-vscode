@@ -204,7 +204,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
-	 * Fetch the list of available models from a single Lemonade endpoint.
+	 * Fetch the list of available models from the Lemonade server.
 	 */
 	private async fetchModels(endpoint: LemonadeEndpoint): Promise<LemonadeModel[]> {
 		const apiKey = endpoint.apiKey || DEFAULT_API_KEY;
