@@ -12,7 +12,7 @@ import {
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
 import type { LemonadeModel, LemonadeModelsResponse } from "./types";
 
-const DEFAULT_BASE_URL = "http://localhost:8000/api/v1";
+const DEFAULT_BASE_URL = "http://localhost:13305/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_API_KEY = "lemonade";
