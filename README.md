@@ -28,7 +28,7 @@ You can now start chatting with your local LLM models! 🥳
 
 
 ## 🔧 Configuration
-The extension connects to `http://localhost:8000/api/v1` by default. You can change this by:
+The extension connects to `http://localhost:13305/api/v1` by default. You can change this by:
 1. Opening VS Code Command Palette (Ctrl+Shift+P)
 2. Running "Manage Lemonade Provider" command
 3. Entering your custom Lemonade server URL
