@@ -138,7 +138,7 @@ async function addEndpointFlow(
 
 	const url = await vscode.window.showInputBox({
 		title: "Add Lemonade Endpoint (2/3) — URL",
-		prompt: "Enter the server URL (e.g. http://192.168.1.17:8000/api/v1)",
+		prompt: "Enter the server URL (e.g. http://fqdn.local:13305/api/v1)",
 		value: "http://",
 		ignoreFocusOut: true,
 		validateInput: isValidUrl,
