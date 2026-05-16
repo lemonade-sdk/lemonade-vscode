@@ -26,7 +26,6 @@ export interface OpenAIChatMessage {
 	tool_call_id?: string;
 }
 
-
 /**
  * Buffer used to accumulate streamed tool call parts until arguments are valid JSON.
  */
@@ -44,6 +43,9 @@ export interface LemonadeModel {
 	object: string;
 	created?: number;
 	owned_by?: string;
+	recipe_options?: {
+		ctx_size?: number;
+	};
 }
 
 /**
