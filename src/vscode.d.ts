@@ -20415,6 +20415,10 @@ declare module 'vscode' {
 		readonly id: string;
 
 		/**
+		 * Source Provider
+		 */
+		readonly source: string;
+		/**
 		 * Human-readable name of the language model.
 		 */
 		readonly name: string;
@@ -20452,6 +20456,11 @@ declare module 'vscode' {
 		 * The maximum number of tokens the model is capable of producing.
 		 */
 		readonly maxOutputTokens: number;
+
+		/**
+		 * isUserSelectable controls whether this model should be offered as a selectable option in the UI.
+		 */
+		readonly isUserSelectable: boolean;
 
 		/**
 		 * Various features that the model supports such as tool calling or image input.

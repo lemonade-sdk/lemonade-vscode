@@ -132,6 +132,8 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			version: "1.0.0",
 			maxInputTokens: maxInput,
 			maxOutputTokens: maxOutput,
+			isUserSelectable: true,
+			source: "lemonade",
 			capabilities: {
 				toolCalling: true,
 				imageInput: false,
