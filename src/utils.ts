@@ -138,9 +138,13 @@ function sanitizeSchema(input: unknown, propName?: string): Record<string, unkno
 /**
  * Convert VS Code chat request messages into OpenAI-compatible message objects.
  * @param messages The VS Code chat messages to convert.
+ * @param filterEphemeral Whether to filter out ephemeral data sentinels.
  * @returns OpenAI-compatible messages array.
  */
-export function convertMessages(messages: readonly vscode.LanguageModelChatRequestMessage[]): OpenAIChatMessage[] {
+export function convertMessages(
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+	filterEphemeral: boolean = true
+): OpenAIChatMessage[] {
 	const out: OpenAIChatMessage[] = [];
 	for (const m of messages) {
 		const role = mapRole(m);
@@ -162,7 +166,7 @@ export function convertMessages(messages: readonly vscode.LanguageModelChatReque
 				toolCalls.push({ id, type: "function", function: { name: part.name, arguments: args } });
 			} else if (isToolResultPart(part)) {
 				const callId = (part as { callId?: string }).callId ?? "";
-				const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
+				const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> }, filterEphemeral);
 				toolResults.push({ callId, content });
 			}
 		}
@@ -323,8 +327,12 @@ function mapRole(message: vscode.LanguageModelChatRequestMessage): Exclude<OpenA
 /**
  * Concatenate tool result content into a single text string.
  * @param pr Tool result-like object with content array.
+ * @param filterEphemeral Whether to filter out ephemeral data sentinels.
  */
-function collectToolResultText(pr: { content?: ReadonlyArray<unknown> }): string {
+function collectToolResultText(
+	pr: { content?: ReadonlyArray<unknown> },
+	filterEphemeral: boolean = true
+): string {
 	let text = "";
 	for (const c of pr.content ?? []) {
 		if (c instanceof vscode.LanguageModelTextPart) {
@@ -332,11 +340,23 @@ function collectToolResultText(pr: { content?: ReadonlyArray<unknown> }): string
 		} else if (typeof c === "string") {
 			text += c;
 		} else {
-			try {
-				text += JSON.stringify(c);
-			} catch {
-				/* ignore */
+			// Check for cache_control sentinel (VS Code 1.118+ internal sentinel)
+			const isObj = !!c && typeof c === "object";
+			const mimeType = isObj ? (c as { mimeType?: unknown }).mimeType : undefined;
+
+			if (filterEphemeral && mimeType === "cache_control") {
+				// Silently drop the sentinel to prevent it from leaking into tool output
+				continue;
 			}
+
+			// For non-filtering mode or unknown parts, warn but don't serialize
+			const ctor = isObj
+				? (Object.getPrototypeOf(c as object) as { constructor?: { name?: string } } | undefined)
+					?.constructor?.name
+				: undefined;
+			console.warn(
+				`[Lemonade Model Provider] dropped unknown tool-result part: ctor=${ctor ?? typeof c} mimeType=${String(mimeType)}`
+			);
 		}
 	}
 	return text;

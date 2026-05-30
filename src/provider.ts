@@ -280,7 +280,11 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			const baseUrl = endpoint.url;
 			const apiKey = endpoint.apiKey || DEFAULT_API_KEY;
 
-            const openaiMessages = convertMessages(messages);
+			// Check if ephemeral data filtering is enabled (default: true)
+			const filterEphemeralSetting = await this.secrets.get("lemonade.filterEphemeralData");
+			const filterEphemeral = filterEphemeralSetting !== "false";
+
+            const openaiMessages = convertMessages(messages, filterEphemeral);
 
 			validateRequest(messages);
 

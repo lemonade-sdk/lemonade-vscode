@@ -44,6 +44,10 @@
 			{
 				"command": "lemonade.manage",
 				"title": "Manage Lemonade Provider"
+			},
+			{
+				"command": "lemonade.toggleEphemeralFilter",
+				"title": "Toggle Lemonade filter ephemeral data"
 			}
 		]
 	},
