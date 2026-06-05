@@ -10,12 +10,13 @@ import {
 } from "vscode";
 
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
-import type { LemonadeModel, LemonadeModelsResponse } from "./types";
+import type { LemonadeEndpoint, LemonadeModel, LemonadeModelsResponse } from "./types";
 
 const DEFAULT_BASE_URL = "http://localhost:13305/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_API_KEY = "lemonade";
+const ENDPOINTS_SECRET_KEY = "lemonade.endpoints";
 
 /**
  * Resolve the context length to use. Reads LEMONADE_CTX_SIZE from the
@@ -100,43 +101,55 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
-	 * Get the list of available language models contributed by this provider
-	 * @param options Options which specify the calling context of this function
-	 * @param token A cancellation token which signals if the user cancelled the request or not
-	 * @returns A promise that resolves to the list of available language models
+	 * Get the list of available language models contributed by this provider.
+	 * Fans out to all configured endpoints concurrently; failures on individual
+	 * endpoints are swallowed so healthy nodes still appear.
 	 */
 	async prepareLanguageModelChatInformation(
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
-		// Fetch available models from the Lemonade server
-		const models = await this.fetchModels();
-
-		if (models.length === 0) {
-			if (!options.silent) {
-				vscode.window.showWarningMessage(
-					"No models available from Lemonade server. Make sure Lemonade server is running. You can download it from lemonade-server.ai."
-				);
-			}
-			return [];
-		}
-
+		const endpoints = await this.getEndpoints();
 		const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
 		const maxInput = Math.max(1, resolveContextLength() - maxOutput);
 
-		const infos: LanguageModelChatInformation[] = models.map(model => ({
-			id: model.id,
-			name: model.id,
-			tooltip: "Lemonade Local LLM",
-			family: "lemonade",
-			version: "1.0.0",
-			maxInputTokens: maxInput,
-			maxOutputTokens: maxOutput,
-			capabilities: {
-				toolCalling: true,
-				imageInput: false,
-			},
-		} satisfies LanguageModelChatInformation));
+		// Fetch models from all endpoints concurrently; ignore per-endpoint errors
+		const results = await Promise.all(
+			endpoints.map(async (ep) => {
+				try {
+					const models = await this.fetchModels(ep);
+					return { ep, models };
+				} catch {
+					return { ep, models: [] as LemonadeModel[] };
+				}
+			})
+		);
+
+		const infos: LanguageModelChatInformation[] = [];
+		for (const { ep, models } of results) {
+			for (const model of models) {
+				const id = `${ep.shortname}/${model.id}`;
+				infos.push({
+					id,
+					name: id,
+					tooltip: `Lemonade node: ${ep.url}`,
+					family: "lemonade",
+					version: "1.0.0",
+					maxInputTokens: maxInput,
+					maxOutputTokens: maxOutput,
+					capabilities: {
+						toolCalling: true,
+						imageInput: false,
+					},
+				} satisfies LanguageModelChatInformation);
+			}
+		}
+
+		if (infos.length === 0 && !options.silent) {
+			vscode.window.showWarningMessage(
+				"No models available from any Lemonade endpoint. Make sure at least one server is running. You can download it from lemonade-server.ai."
+			);
+		}
 
 		this._chatEndpoints = infos.map((info) => ({
 			model: info.id,
@@ -154,53 +167,62 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
-	 * Get the configured server URL or return the default.
+	 * Return the list of configured endpoints. Falls back to a single default
+	 * endpoint when nothing has been configured yet, and migrates legacy
+	 * single-URL secrets on first access.
 	 */
-	private async getServerUrl(): Promise<string> {
-		const stored = await this.secrets.get("lemonade.serverUrl");
-		return stored || DEFAULT_BASE_URL;
-	}
+	async getEndpoints(): Promise<LemonadeEndpoint[]> {
+		// Migration: promote legacy single-URL secrets to the new format
+		const legacyUrl = await this.secrets.get("lemonade.serverUrl");
+		if (legacyUrl) {
+			const legacyKey = await this.secrets.get("lemonade.apiKey");
+			const migrated: LemonadeEndpoint[] = [{
+				shortname: "default",
+				url: legacyUrl,
+				...(legacyKey ? { apiKey: legacyKey } : {}),
+			}];
+			await this.secrets.store(ENDPOINTS_SECRET_KEY, JSON.stringify(migrated));
+			await this.secrets.delete("lemonade.serverUrl");
+			await this.secrets.delete("lemonade.apiKey");
+			return migrated;
+		}
 
-	/**
-	 * Get the configured API key or return the default.
-	 */
-	private async getApiKey(): Promise<string> {
-		const stored = await this.secrets.get("lemonade.apiKey");
-		return stored || DEFAULT_API_KEY;
+		const stored = await this.secrets.get(ENDPOINTS_SECRET_KEY);
+		if (stored) {
+			try {
+				const parsed = JSON.parse(stored) as LemonadeEndpoint[];
+				if (Array.isArray(parsed) && parsed.length > 0) {
+					return parsed;
+				}
+			} catch {
+				// fall through to default
+			}
+		}
+
+		// No config yet — return built-in default so extension works out of the box
+		return [{ shortname: "default", url: DEFAULT_BASE_URL }];
 	}
 
 	/**
 	 * Fetch the list of available models from the Lemonade server.
 	 */
-	private async fetchModels(): Promise<LemonadeModel[]> {
-		const baseUrl = await this.getServerUrl();
-		const apiKey = await this.getApiKey();
+	private async fetchModels(endpoint: LemonadeEndpoint): Promise<LemonadeModel[]> {
+		const apiKey = endpoint.apiKey || DEFAULT_API_KEY;
 
-		try {
-			const response = await fetch(`${baseUrl}/models`, {
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					"User-Agent": this.userAgent,
-				},
-			});
+		const response = await fetch(`${endpoint.url}/models`, {
+			method: "GET",
+			headers: {
+				Authorization: `Bearer ${apiKey}`,
+				"User-Agent": this.userAgent,
+			},
+		});
 
-			if (!response.ok) {
-				console.error("[Lemonade Model Provider] Failed to fetch models", {
-					status: response.status,
-					statusText: response.statusText,
-				});
-				throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
-			}
-
-			const data = (await response.json()) as LemonadeModelsResponse;
-			return data.data || [];
-		} catch (error) {
-			console.error("[Lemonade Model Provider] Error fetching models", error);
-			// Return empty array on error - this will result in no models being available
-			// which is better than crashing the extension
-			return [];
+		if (!response.ok) {
+			throw new Error(`[Lemonade] Failed to fetch models from ${endpoint.shortname}: ${response.status} ${response.statusText}`);
 		}
+
+		const data = (await response.json()) as LemonadeModelsResponse;
+		return data.data || [];
 	}
 
 	/**
@@ -245,8 +267,18 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			},
 		};
 		try {
-			const baseUrl = await this.getServerUrl();
-			const apiKey = await this.getApiKey();
+			// Decode "<shortname>/<modelId>" from the model id
+			const slashIdx = model.id.indexOf("/");
+			const shortname = slashIdx >= 0 ? model.id.slice(0, slashIdx) : "default";
+			const realModelId = slashIdx >= 0 ? model.id.slice(slashIdx + 1) : model.id;
+
+			const endpoints = await this.getEndpoints();
+			const endpoint = endpoints.find(ep => ep.shortname === shortname)
+				?? endpoints[0]
+				?? { shortname: "default", url: DEFAULT_BASE_URL };
+
+			const baseUrl = endpoint.url;
+			const apiKey = endpoint.apiKey || DEFAULT_API_KEY;
 
             const openaiMessages = convertMessages(messages);
 
@@ -267,7 +299,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
             }
 
             requestBody = {
-                model: model.id,
+                model: realModelId,
                 messages: openaiMessages,
                 stream: true,
                 max_tokens: Math.min(options.modelOptions?.max_tokens || 4096, model.maxOutputTokens),
