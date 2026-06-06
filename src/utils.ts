@@ -345,18 +345,23 @@ function collectToolResultText(
 			const mimeType = isObj ? (c as { mimeType?: unknown }).mimeType : undefined;
 
 			if (filterEphemeral && mimeType === "cache_control") {
-				// Silently drop the sentinel to prevent it from leaking into tool output
+				// Silently drop the cache_control sentinel to prevent it from leaking into tool output
 				continue;
 			}
 
-			// For non-filtering mode or unknown parts, warn but don't serialize
-			const ctor = isObj
-				? (Object.getPrototypeOf(c as object) as { constructor?: { name?: string } } | undefined)
-					?.constructor?.name
-				: undefined;
-			console.warn(
-				`[Lemonade Model Provider] dropped unknown tool-result part: ctor=${ctor ?? typeof c} mimeType=${String(mimeType)}`
-			);
+			// For all other cases, use the original behavior: serialize to JSON
+			try {
+				text += JSON.stringify(c);
+			} catch {
+				// If serialization fails, warn but don't crash
+				const ctor = isObj
+					? (Object.getPrototypeOf(c as object) as { constructor?: { name?: string } } | undefined)
+						?.constructor?.name
+					: undefined;
+				console.warn(
+					`[Lemonade Model Provider] failed to serialize tool-result part: ctor=${ctor ?? typeof c} mimeType=${String(mimeType)}`
+				);
+			}
 		}
 	}
 	return text;
