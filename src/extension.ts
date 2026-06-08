@@ -21,6 +21,31 @@ export function activate(context: vscode.ExtensionContext) {
 			await manageEndpoints(context.secrets, provider);
 		})
 	);
+
+	// Toggle ephemeral data filter command
+	context.subscriptions.push(
+		vscode.commands.registerCommand("lemonade.toggleEphemeralFilter", async () => {
+			const currentSetting = await context.secrets.get("lemonade.filterEphemeralData");
+			const currentStatus = currentSetting === "true" ? "enabled" : currentSetting === "false" ? "disabled" : "default (enabled)";
+
+			const choice = await vscode.window.showQuickPick(
+				[
+					{ label: "Enable", description: "Filter out ephemeral data (recommended)" },
+					{ label: "Disable", description: "Do not filter ephemeral data (for debugging)" },
+					{ label: "Cancel", description: "Abort without changing settings" }
+				],
+				{ placeHolder: `Current state: ${currentStatus}. Select an option:` }
+			);
+
+			if (choice === undefined || choice.label === "Cancel") {
+				return;
+			}
+
+			const newValue = choice.label === "Enable" ? "true" : "false";
+			await context.secrets.store("lemonade.filterEphemeralData", newValue);
+			vscode.window.showInformationMessage(`Lemonade ephemeral data filter ${choice.label.toLowerCase()}d.`);
+		})
+	);
 }
 
 export function deactivate() {}
