@@ -2,6 +2,7 @@ import * as assert from "assert";
 import * as vscode from "vscode";
 import { LemonadeChatModelProvider } from "../provider";
 import { convertMessages, convertTools, validateRequest, validateTools, tryParseJSONObject } from "../utils";
+import type { LemonadeEndpoint } from "../types";
 
 interface OpenAIToolCall {
 	id: string;
@@ -122,6 +123,99 @@ suite("Lemonade Chat Provider Extension", () => {
 				assert.ok(!errMsg.includes("API key"), "Should not fail due to API key");
 			}
 			assert.ok(threw, "Should throw due to connection error");
+		});
+
+		// ------------------------------------------------------------------
+		// Multi-endpoint tests
+		// ------------------------------------------------------------------
+
+		test("getEndpoints returns default when nothing stored", async () => {
+			const provider = new LemonadeChatModelProvider({
+				get: async () => undefined,
+				store: async () => {},
+				delete: async () => {},
+				onDidChange: (_listener: unknown) => ({ dispose() {} }),
+			} as unknown as vscode.SecretStorage, "test/test");
+
+			const endpoints = await provider.getEndpoints();
+			assert.ok(Array.isArray(endpoints) && endpoints.length === 1);
+			assert.equal(endpoints[0].shortname, "default");
+			assert.ok(endpoints[0].url.startsWith("http://localhost"));
+		});
+
+		test("getEndpoints migrates legacy serverUrl secret", async () => {
+			const store: Record<string, string> = {
+				"lemonade.serverUrl": "http://192.168.1.17:8000/api/v1",
+				"lemonade.apiKey": "mykey",
+			};
+			const deleted: string[] = [];
+			const provider = new LemonadeChatModelProvider({
+				get: async (k: string) => store[k],
+				store: async (k: string, v: string) => { store[k] = v; },
+				delete: async (k: string) => { deleted.push(k); delete store[k]; },
+				onDidChange: (_listener: unknown) => ({ dispose() {} }),
+			} as unknown as vscode.SecretStorage, "test/test");
+
+			const endpoints = await provider.getEndpoints();
+			assert.equal(endpoints.length, 1);
+			assert.equal(endpoints[0].shortname, "default");
+			assert.equal(endpoints[0].url, "http://192.168.1.17:8000/api/v1");
+			assert.equal(endpoints[0].apiKey, "mykey");
+			// Legacy keys must be deleted after migration
+			assert.ok(deleted.includes("lemonade.serverUrl"));
+			assert.ok(deleted.includes("lemonade.apiKey"));
+			// New key must be written
+			assert.ok(store["lemonade.endpoints"]);
+		});
+
+		test("getEndpoints reads multiple stored endpoints", async () => {
+			const endpoints: LemonadeEndpoint[] = [
+				{ shortname: "node-17", url: "http://192.168.1.17:8000/api/v1" },
+				{ shortname: "node-80", url: "http://192.168.1.80:8000/api/v1", apiKey: "secret" },
+			];
+			const provider = new LemonadeChatModelProvider({
+				get: async (k: string) => k === "lemonade.endpoints" ? JSON.stringify(endpoints) : undefined,
+				store: async () => {},
+				delete: async () => {},
+				onDidChange: (_listener: unknown) => ({ dispose() {} }),
+			} as unknown as vscode.SecretStorage, "test/test");
+
+			const result = await provider.getEndpoints();
+			assert.equal(result.length, 2);
+			assert.equal(result[0].shortname, "node-17");
+			assert.equal(result[1].shortname, "node-80");
+			assert.equal(result[1].apiKey, "secret");
+		});
+
+		test("prepareLanguageModelChatInformation prefixes model ids with shortname", async () => {
+			const endpoints: LemonadeEndpoint[] = [
+				{ shortname: "node-17", url: "http://192.168.1.17:8000/api/v1" },
+			];
+			// Mock fetch to return a single model
+			const originalFetch = global.fetch;
+			try {
+				(global as unknown as Record<string, unknown>).fetch = async () => ({
+					ok: true,
+					json: async () => ({ object: "list", data: [{ id: "Llama-3.2-3B", object: "model" }] }),
+				});
+
+				const provider = new LemonadeChatModelProvider({
+					get: async (k: string) => k === "lemonade.endpoints" ? JSON.stringify(endpoints) : undefined,
+					store: async () => {},
+					delete: async () => {},
+					onDidChange: (_listener: unknown) => ({ dispose() {} }),
+				} as unknown as vscode.SecretStorage, "test/test");
+
+				const infos = await provider.prepareLanguageModelChatInformation(
+					{ silent: true },
+					new vscode.CancellationTokenSource().token
+				);
+				assert.equal(infos.length, 1);
+				assert.equal(infos[0].id, "node-17/Llama-3.2-3B");
+				assert.equal(infos[0].name, "node-17/Llama-3.2-3B");
+			} finally {
+				(global as unknown as Record<string, unknown>).fetch = originalFetch;
+			}
 		});
 	});
 
