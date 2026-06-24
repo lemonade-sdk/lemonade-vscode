@@ -135,7 +135,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 					tooltip: `Lemonade node: ${ep.url}`,
 					family: "lemonade",
 					version: "1.0.0",
-					maxInputTokens: maxInput,
+					maxInputTokens: model?.recipe_options?.ctx_size ?? maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
 						toolCalling: true,
