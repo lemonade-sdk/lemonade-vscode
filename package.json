@@ -32,6 +32,11 @@
 		"url": "https://github.com/lemonade-sdk/lemonade/issues"
 	},
 	"license": "MIT",
+	"activationEvents": [
+		"onLanguageModelChatProvider:lemonade",
+		"onCommand:lemonade.manage",
+		"onCommand:lemonade.toggleEphemeralFilter"
+	],
 	"contributes": {
 		"languageModelChatProviders": [
 			{
