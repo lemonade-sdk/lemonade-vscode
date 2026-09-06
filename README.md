@@ -38,7 +38,25 @@ The extension connects to `http://localhost:13305/api/v1` by default. You can ch
 
 | Variable | Default | Description |
 |---|---|---|
-| `LEMONADE_CTX_SIZE` | `128000` | Context window size (in tokens) reported to VS Code. Set this to match the `--ctx-size` value used when starting Lemonade so the model picker displays the correct context limits. For example, `LEMONADE_CTX_SIZE=262144` for a 256 k context window. |
+| `LEMONADE_CTX_SIZE` | `262144` | Context window size (in tokens) reported to VS Code. Set this to match the `--ctx-size` value used when starting Lemonade so the model picker displays the correct context limits. For example, `LEMONADE_CTX_SIZE=262144` for a 256 k context window. |
+
+### VS Code settings
+
+Configure the provider in VS Code's `settings.json`:
+
+```json
+{
+    "lemonade.maxOutputTokens": 65536,
+    "lemonade.requestTimeout": 900000
+}
+```
+
+| Setting | Default | Range | Description |
+|---|---:|---:|---|
+| `lemonade.maxOutputTokens` | `65536` | 1 to 262144 | Maximum response tokens advertised to VS Code and requested from Lemonade unless the host supplies a lower `max_tokens` value. Reserve sufficient context for the prompt and tool definitions. |
+| `lemonade.requestTimeout` | `300000` ms | 10000 to 3600000 ms | Total extension-to-Lemonade request timeout, including prompt processing and the complete streamed response. Increase it for long prompts or generations. |
+
+`lemonade.requestTimeout` controls the VS Code extension only. Lemonade server timeouts, backend queueing, and reverse-proxy timeouts are configured independently. The extension logs whether a request was cancelled by VS Code or by its configured timeout in the Extension Host log.
 
 > **Tip:** Launch VS Code from a terminal where `LEMONADE_CTX_SIZE` is already set, or add it to your system/user environment variables so it is always picked up.
 

@@ -13,10 +13,29 @@ import { convertTools, convertMessages, tryParseJSONObject, validateRequest } fr
 import type { LemonadeEndpoint, LemonadeModel, LemonadeModelsResponse } from "./types";
 
 const DEFAULT_BASE_URL = "http://localhost:13305/api/v1";
-const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
-const DEFAULT_CONTEXT_LENGTH = 128000;
+const DEFAULT_MAX_OUTPUT_TOKENS = 65536;
+const DEFAULT_CONTEXT_LENGTH = 262144;
 const DEFAULT_API_KEY = "lemonade";
+const DEFAULT_REQUEST_TIMEOUT = 300000;
 const ENDPOINTS_SECRET_KEY = "lemonade.endpoints";
+
+/**
+ * Resolve the max output tokens to use. Reads from VS Code setting
+ * `lemonade.maxOutputTokens`; falls back to DEFAULT_MAX_OUTPUT_TOKENS when
+ * the setting is absent, not a positive integer, or when running outside VS Code.
+ */
+async function resolveMaxOutputTokens(): Promise<number> {
+	try {
+		const config = vscode.workspace.getConfiguration("lemonade");
+		const raw = config.get<number>("maxOutputTokens");
+		if (raw !== undefined && Number.isFinite(raw) && raw > 0) {
+			return raw;
+		}
+	} catch {
+		// Running outside VS Code (e.g., tests) — fall through to default
+	}
+	return DEFAULT_MAX_OUTPUT_TOKENS;
+}
 
 /**
  * Resolve the context length to use. Reads LEMONADE_CTX_SIZE from the
@@ -32,6 +51,19 @@ function resolveContextLength(): number {
 		}
 	}
 	return DEFAULT_CONTEXT_LENGTH;
+}
+
+/** Resolve the maximum time allowed for an HTTP request, including streaming. */
+function resolveRequestTimeout(): number {
+	try {
+		const raw = vscode.workspace.getConfiguration("lemonade").get<number>("requestTimeout");
+		if (raw !== undefined && Number.isFinite(raw) && raw > 0) {
+			return raw;
+		}
+	} catch {
+		// Running outside VS Code (e.g., tests) — use the default.
+	}
+	return DEFAULT_REQUEST_TIMEOUT;
 }
 
 /**
@@ -110,7 +142,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
 		const endpoints = await this.getEndpoints();
-		const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
+		const maxOutput = await resolveMaxOutputTokens();
 		const maxInput = Math.max(1, resolveContextLength() - maxOutput);
 
 		// Fetch models from all endpoints concurrently; ignore per-endpoint errors
@@ -208,21 +240,28 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	 */
 	private async fetchModels(endpoint: LemonadeEndpoint): Promise<LemonadeModel[]> {
 		const apiKey = endpoint.apiKey || DEFAULT_API_KEY;
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), resolveRequestTimeout());
 
-		const response = await fetch(`${endpoint.url}/models`, {
-			method: "GET",
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				"User-Agent": this.userAgent,
-			},
-		});
+		try {
+			const response = await fetch(`${endpoint.url}/models`, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${apiKey}`,
+					"User-Agent": this.userAgent,
+				},
+				signal: controller.signal,
+			});
 
-		if (!response.ok) {
-			throw new Error(`[Lemonade] Failed to fetch models from ${endpoint.shortname}: ${response.status} ${response.statusText}`);
+			if (!response.ok) {
+				throw new Error(`[Lemonade] Failed to fetch models from ${endpoint.shortname}: ${response.status} ${response.statusText}`);
+				}
+
+			const data = (await response.json()) as LemonadeModelsResponse;
+			return data.data || [];
+		} finally {
+			clearTimeout(timeoutId);
 		}
-
-		const data = (await response.json()) as LemonadeModelsResponse;
-		return data.data || [];
 	}
 
 	/**
@@ -302,11 +341,12 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
                 throw new Error("Message exceeds token limit.");
             }
 
+            const maxOutputTokens = await resolveMaxOutputTokens();
             requestBody = {
                 model: realModelId,
                 messages: openaiMessages,
                 stream: true,
-                max_tokens: Math.min(options.modelOptions?.max_tokens || 4096, model.maxOutputTokens),
+                max_tokens: Math.min(options.modelOptions?.max_tokens ?? maxOutputTokens, model.maxOutputTokens),
                 temperature: options.modelOptions?.temperature ?? 0.7,
             };
 
@@ -330,28 +370,49 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			if (toolConfig.tool_choice) {
 				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
 			}
-			const response = await fetch(`${baseUrl}/chat/completions`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    "Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-                },
-                body: JSON.stringify(requestBody),
-            });
+			const controller = new AbortController();
+			    const requestTimeout = resolveRequestTimeout();
+			    const timeoutId = setTimeout(() => {
+				    console.error("[Lemonade Model Provider] HTTP request timeout", {
+					    modelId: model.id,
+					    timeoutMs: requestTimeout,
+				    });
+				    controller.abort();
+			    }, requestTimeout);
+			    const cancellationSubscription = token.onCancellationRequested(() => {
+				    console.error("[Lemonade Model Provider] VS Code cancelled HTTP request", {
+					    modelId: model.id,
+				    });
+				    controller.abort();
+			    });
+			try {
+				const response = await fetch(`${baseUrl}/chat/completions`, {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${apiKey}`,
+						"Content-Type": "application/json",
+						"User-Agent": this.userAgent,
+					},
+					body: JSON.stringify(requestBody),
+					signal: controller.signal,
+				});
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				console.error("[Lemonade Model Provider] API error response", errorText);
-				throw new Error(
-					`Lemonade API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
-				);
-			}
+				if (!response.ok) {
+					const errorText = await response.text();
+					console.error("[Lemonade Model Provider] API error response", errorText);
+					throw new Error(
+						`Lemonade API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
+					);
+				}
 
-			if (!response.body) {
-				throw new Error("No response body from Lemonade API");
+				if (!response.body) {
+					throw new Error("No response body from Lemonade API");
+				}
+				await this.processStreamingResponse(response.body, trackingProgress, token);
+			} finally {
+				cancellationSubscription.dispose();
+				clearTimeout(timeoutId);
 			}
-			await this.processStreamingResponse(response.body, trackingProgress, token);
 		} catch (err) {
 			console.error("[Lemonade Model Provider] Chat request failed", {
 				modelId: model.id,
@@ -426,9 +487,17 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 
 					try {
 						const parsed = JSON.parse(data);
+						const error = parsed.error as Record<string, unknown> | undefined;
+						if (error && typeof error.message === "string") {
+							throw new Error(`Lemonade streaming error: ${error.message}`);
+						}
                         await this.processDelta(parsed, progress);
-                    } catch {
-                        // Silently ignore malformed SSE lines temporarily
+					} catch (error) {
+						if (error instanceof SyntaxError) {
+							// Ignore malformed SSE lines until the server finishes the stream.
+							continue;
+						}
+						throw error;
                     }
                 }
             }
@@ -463,8 +532,12 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		const deltaObj = choice.delta as Record<string, unknown> | undefined;
 
 		// report thinking progress if backend provides it and host supports it
+		// Backend may use either 'thinking' (standard) or 'reasoning_content' (llama.cpp deepseek)
 		try {
-			const maybeThinking = (choice as Record<string, unknown> | undefined)?.thinking ?? (deltaObj as Record<string, unknown> | undefined)?.thinking;
+			const maybeThinking = (choice as Record<string, unknown> | undefined)?.thinking 
+				?? (deltaObj as Record<string, unknown> | undefined)?.thinking 
+				?? (choice as Record<string, unknown> | undefined)?.reasoning_content 
+				?? (deltaObj as Record<string, unknown> | undefined)?.reasoning_content;
 			if (maybeThinking !== undefined) {
 				const vsAny = (vscode as unknown as Record<string, unknown>);
 				const ThinkingCtor = vsAny["LanguageModelThinkingPart"] as
