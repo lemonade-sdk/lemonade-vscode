@@ -217,6 +217,60 @@ suite("Lemonade Chat Provider Extension", () => {
 				(global as unknown as Record<string, unknown>).fetch = originalFetch;
 			}
 		});
+
+		test("prepareLanguageModelChatInformation derives token budgets from recipe ctx_size", async () => {
+			const endpoints: LemonadeEndpoint[] = [
+				{ shortname: "node", url: "http://localhost:13305/api/v1" },
+			];
+			const originalFetch = global.fetch;
+			const originalCtx = process.env["LEMONADE_CTX_SIZE"];
+			try {
+				delete process.env["LEMONADE_CTX_SIZE"];
+				(global as unknown as Record<string, unknown>).fetch = async () => ({
+					ok: true,
+					json: async () => ({
+						object: "list",
+						data: [
+							{ id: "big", object: "model", recipe_options: { ctx_size: 200000 } },
+							{ id: "small", object: "model", recipe_options: { ctx_size: 32768 } },
+							{ id: "invalid", object: "model", recipe_options: { ctx_size: 0 } },
+							{ id: "none", object: "model" },
+						],
+					}),
+				});
+
+				const provider = new LemonadeChatModelProvider({
+					get: async (k: string) => k === "lemonade.endpoints" ? JSON.stringify(endpoints) : undefined,
+					store: async () => {},
+					delete: async () => {},
+					onDidChange: (_listener: unknown) => ({ dispose() {} }),
+				} as unknown as vscode.SecretStorage, "test/test");
+
+				const infos = await provider.prepareLanguageModelChatInformation(
+					{ silent: true },
+					new vscode.CancellationTokenSource().token
+				);
+				const byId = Object.fromEntries(infos.map((i) => [i.id, i]));
+
+				assert.equal(byId["node/big"].maxOutputTokens, 16000);
+				assert.equal(byId["node/big"].maxInputTokens, 184000);
+
+				assert.equal(byId["node/small"].maxOutputTokens, 16000);
+				assert.equal(byId["node/small"].maxInputTokens, 16768);
+
+				for (const id of ["node/invalid", "node/none"]) {
+					assert.equal(byId[id].maxOutputTokens, 16000);
+					assert.equal(byId[id].maxInputTokens, 112000);
+				}
+			} finally {
+				(global as unknown as Record<string, unknown>).fetch = originalFetch;
+				if (originalCtx === undefined) {
+					delete process.env["LEMONADE_CTX_SIZE"];
+				} else {
+					process.env["LEMONADE_CTX_SIZE"] = originalCtx;
+				}
+			}
+		});
 	});
 
 	suite("utils/convertMessages", () => {

@@ -110,8 +110,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
 		const endpoints = await this.getEndpoints();
-		const maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
-		const maxInput = Math.max(1, resolveContextLength() - maxOutput);
+		const fallbackContextLength = resolveContextLength();
 
 		// Fetch models from all endpoints concurrently; ignore per-endpoint errors
 		const results = await Promise.all(
@@ -129,13 +128,21 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		for (const { ep, models } of results) {
 			for (const model of models) {
 				const id = `${ep.shortname}/${model.id}`;
+				const rawCtxSize = model?.recipe_options?.ctx_size;
+				const contextLength =
+					typeof rawCtxSize === "number" && Number.isFinite(rawCtxSize) && rawCtxSize > 0
+						? rawCtxSize
+						: fallbackContextLength;
+				// maxInputTokens + maxOutputTokens must not exceed the model's context window
+				const maxOutput = Math.min(DEFAULT_MAX_OUTPUT_TOKENS, Math.max(1, contextLength - 1));
+				const maxInput = Math.max(1, contextLength - maxOutput);
 				infos.push({
 					id,
 					name: id,
 					tooltip: `Lemonade node: ${ep.url}`,
 					family: "lemonade",
 					version: "1.0.0",
-					maxInputTokens: model?.recipe_options?.ctx_size ?? maxInput,
+					maxInputTokens: maxInput,
 					maxOutputTokens: maxOutput,
 					capabilities: {
 						toolCalling: true,
