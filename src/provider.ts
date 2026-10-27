@@ -393,7 +393,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
                 model: realModelId,
                 messages: openaiMessages,
                 stream: true,
-                max_tokens: Math.min(options.modelOptions?.max_tokens || 4096, model.maxOutputTokens),
+                max_tokens: Math.max(options.modelOptions?.max_tokens || 4096, model.maxOutputTokens),
                 temperature: options.modelOptions?.temperature ?? 0.7,
             };
 
