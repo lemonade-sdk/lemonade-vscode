@@ -36,7 +36,23 @@ The extension connects to `http://localhost:13305/api/v1` by default. You can ch
 4. Optionally, entering your API key (if your server has `LEMONADE_API_KEY` configured)
 
 ### Limiting visible models
-In the server form, the optional **Models** list restricts the model picker to the listed model ids (exactly as returned by the server, e.g. `Qwen3-Coder-30B-A3B-Instruct-GGUF`). Leave it empty to show all models. Names the server does not return are ignored.
+The optional `models` setting restricts the model picker to the listed model ids. Leave it unset or empty to show all models. Names the server does not return are ignored, and matching is exact.
+
+List the ids your server provides:
+```bash
+curl -s http://localhost:13305/api/v1/models
+```
+
+If the server form does not show a **Models** field, add it to the Lemonade entry in `chatLanguageModels.json` (open it from the Command Palette with **Chat: Manage Language Models**, or find it in your VS Code user data folder), then reload the window:
+```json
+{
+	"name": "Lemonade",
+	"vendor": "lemonade",
+	"url": "http://localhost:13305/api/v1",
+	"models": ["Qwen3-Coder-30B-A3B-Instruct-GGUF", "Qwen3.5-2B-GGUF-Q8_0"]
+}
+```
+Remove `models` to show every model again. This applies to servers added through the provider form, not through the older `lemonade.manage` command.
 
 ### Environment Variables
 
