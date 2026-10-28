@@ -200,6 +200,42 @@ suite("Chat HTTP cancellation", () => {
 		}
 	});
 
+	test("overlapping requests do not share streaming state", async () => {
+		let stalled: ServerResponse | undefined;
+		handleRequest = (response) => {
+			response.writeHead(200, { "Content-Type": "text/event-stream" });
+			if (requestCount === 1) {
+				stalled = response;
+				response.write(
+					'data: {"choices":[{"delta":{"content":"Reading"}}]}\n\n' +
+					'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"read","arguments":"{\\"path\\":"}}]}}]}\n\n'
+				);
+			} else {
+				response.end('data: {"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+			}
+		};
+		const firstPart = deferred<void>();
+		const parts: vscode.LanguageModelResponsePart[] = [];
+		const first = chat((part) => {
+			parts.push(part);
+			firstPart.resolve();
+		});
+		await firstPart.promise;
+
+		await promptly(chat());
+		assert.ok(stalled);
+		stalled.end(
+			'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"a.txt\\"}"}}]},"finish_reason":"tool_calls"}]}\n\n' +
+			"data: [DONE]\n\n"
+		);
+		await promptly(first);
+
+		const toolCalls = parts.filter((part) => part instanceof vscode.LanguageModelToolCallPart);
+		assert.equal(toolCalls.length, 1);
+		assert.equal(toolCalls[0].name, "read");
+		assert.deepEqual(toolCalls[0].input, { path: "a.txt" });
+	});
+
 	test("HTTP errors without cancellation remain visible", async () => {
 		handleRequest = (response) => {
 			response.writeHead(503, { "Content-Type": "text/plain" });
