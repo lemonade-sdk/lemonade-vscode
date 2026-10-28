@@ -327,6 +327,9 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		progress: Progress<LanguageModelResponsePart>,
 		token: CancellationToken
 	): Promise<void> {
+		if (token.isCancellationRequested) {
+			return;
+		}
 
 		this._toolCallBuffers.clear();
 		this._completedToolCallIndices.clear();
@@ -338,9 +341,14 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
         this._emittedTextToolCallIds.clear();
 		this._controlTokenBuffer = "";
 
+		const abortController = new AbortController();
+		const cancellation = token.onCancellationRequested(() => abortController.abort());
 		let requestBody: Record<string, unknown> | undefined;
 		const trackingProgress: Progress<LanguageModelResponsePart> = {
 			report: (part) => {
+				if (token.isCancellationRequested) {
+					return;
+				}
 				try {
 					progress.report(part);
 				} catch (e) {
@@ -427,6 +435,9 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			if (toolConfig.tool_choice) {
 				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
 			}
+			if (token.isCancellationRequested) {
+				return;
+			}
 			const response = await fetch(`${baseUrl}/chat/completions`, {
                 method: "POST",
                 headers: {
@@ -435,6 +446,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 					"User-Agent": this.userAgent,
                 },
                 body: JSON.stringify(requestBody),
+				signal: abortController.signal,
             });
 
 			if (!response.ok) {
@@ -450,12 +462,19 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			}
 			await this.processStreamingResponse(response.body, trackingProgress, token);
 		} catch (err) {
+			if (token.isCancellationRequested && abortController.signal.aborted) {
+				return;
+			}
 			console.error("[Lemonade Model Provider] Chat request failed", {
 				modelId: model.id,
 				messageCount: messages.length,
 				error: err instanceof Error ? { name: err.name, message: err.message } : String(err),
 			});
 			throw err;
+		} finally {
+			cancellation.dispose();
+			// Also close an unread response body if processing ended early.
+			abortController.abort();
 		}
 	}
 
@@ -502,13 +521,14 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		try {
 			while (!token.isCancellationRequested) {
 				const { done, value } = await reader.read();
-                if (done) { break; }
+                if (done || token.isCancellationRequested) { break; }
 
 				buffer += decoder.decode(value, { stream: true });
 				const lines = buffer.split("\n");
 				buffer = lines.pop() || "";
 
 				for (const line of lines) {
+					if (token.isCancellationRequested) { break; }
 					if (!line.startsWith("data: ")) {
 						continue;
 					}
