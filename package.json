@@ -37,6 +37,7 @@
 			{
 				"vendor": "lemonade",
 				"displayName": "Lemonade",
+				"icon": "assets/provider-icon.png",
 				"configuration": {
 					"type": "object",
 					"properties": {
