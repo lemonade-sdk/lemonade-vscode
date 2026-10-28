@@ -51,6 +51,12 @@
 							"title": "API Key",
 							"description": "Optional API key. Leave empty to use the default.",
 							"secret": true
+						},
+						"models": {
+							"type": "array",
+							"title": "Models",
+							"description": "Optional model ids to show from this server. Leave empty to show all models.",
+							"items": { "type": "string" }
 						}
 					},
 					"required": ["url"]

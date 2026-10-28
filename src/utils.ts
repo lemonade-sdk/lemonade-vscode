@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { OpenAIChatMessage, OpenAIChatRole, OpenAIFunctionToolDef, OpenAIToolCall } from "./types";
+import type { LemonadeModel, OpenAIChatMessage, OpenAIChatRole, OpenAIFunctionToolDef, OpenAIToolCall } from "./types";
 
 // Tool calling sanitization helpers
 
@@ -385,4 +385,16 @@ export function tryParseJSONObject(text: string): { ok: true; value: Record<stri
 	} catch {
 		return { ok: false };
 	}
+}
+
+/**
+ * Keep only models whose server id is in the allow-list, preserving server order.
+ * An unset or empty allow-list keeps every model.
+ */
+export function filterModels(models: readonly LemonadeModel[], allowed: readonly string[] | undefined): LemonadeModel[] {
+	if (!allowed || allowed.length === 0) {
+		return [...models];
+	}
+	const ids = new Set(allowed);
+	return models.filter((model) => ids.has(model.id));
 }

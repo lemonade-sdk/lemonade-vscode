@@ -9,7 +9,7 @@ import {
 	Progress,
 } from "vscode";
 
-import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
+import { convertTools, convertMessages, filterModels, tryParseJSONObject, validateRequest } from "./utils";
 import type { LemonadeEndpoint, LemonadeModel, LemonadeModelsResponse } from "./types";
 import { resolveModelContextLengths } from "./modelContext";
 
@@ -164,7 +164,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		const results = await Promise.all(
 			endpoints.map(async (ep) => {
 				try {
-					const models = await this.fetchModels(ep);
+					const models = filterModels(await this.fetchModels(ep), ep.models);
 					const contextSignal = AbortSignal.timeout(2500);
 					const contextLengths = await resolveModelContextLengths(
 						models, fallbackContextLength, async (path) => {
@@ -246,7 +246,15 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		const url = typeof configuration?.url === "string" ? configuration.url.trim().replace(/\/+$/, "") : "";
 		if (!url) { return undefined; }
 		const apiKey = typeof configuration?.apiKey === "string" ? configuration.apiKey.trim() : "";
-		return { shortname: group ?? "default", url, ...(apiKey ? { apiKey } : {}) };
+		const models = Array.isArray(configuration?.models)
+			? configuration.models.filter((m): m is string => typeof m === "string" && m.trim().length > 0).map((m) => m.trim())
+			: [];
+		return {
+			shortname: group ?? "default",
+			url,
+			...(apiKey ? { apiKey } : {}),
+			...(models.length > 0 ? { models } : {}),
+		};
 	}
 
 	/**

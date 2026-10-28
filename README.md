@@ -35,6 +35,9 @@ The extension connects to `http://localhost:13305/api/v1` by default. You can ch
 3. Entering your custom Lemonade server URL
 4. Optionally, entering your API key (if your server has `LEMONADE_API_KEY` configured)
 
+### Limiting visible models
+In the server form, the optional **Models** list restricts the model picker to the listed model ids (exactly as returned by the server, e.g. `Qwen3-Coder-30B-A3B-Instruct-GGUF`). Leave it empty to show all models. Names the server does not return are ignored.
+
 ### Environment Variables
 
 | Variable | Default | Description |
