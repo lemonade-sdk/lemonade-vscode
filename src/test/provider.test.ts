@@ -362,6 +362,103 @@ suite("Lemonade Chat Provider Extension", () => {
 		});
 	});
 
+	suite("stats and usage report", () => {
+		/**
+		 * Run one chat request against a mocked stream serving the given SSE
+		 * payloads; returns the reported parts and the parsed chat request body.
+		 */
+		async function runUsageRequest(ssePayloads: string[]): Promise<{ parts: unknown[]; body: Record<string, unknown> }> {
+			const originalFetch = global.fetch;
+			const bodies: string[] = [];
+			try {
+				const encoder = new TextEncoder();
+				(global as unknown as Record<string, unknown>).fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+					bodies.push(String(init?.body));
+					return {
+						ok: true,
+						body: new ReadableStream<Uint8Array>({
+							start(controller) {
+								for (const payload of ssePayloads) {
+									controller.enqueue(encoder.encode(payload));
+								}
+								controller.close();
+							},
+						}),
+						text: async () => "",
+					};
+				};
+
+				const provider = new LemonadeChatModelProvider({
+					get: async () => undefined,
+					store: async () => {},
+					delete: async () => {},
+					onDidChange: (_listener: unknown) => ({ dispose() {} }),
+				} as unknown as vscode.SecretStorage, "test/test");
+
+				const parts: unknown[] = [];
+				await provider.provideLanguageModelChatResponse(
+					{
+						id: "m",
+						name: "m",
+						family: "lemonade",
+						version: "1.0.0",
+						maxInputTokens: 1000,
+						maxOutputTokens: 1000,
+						capabilities: {},
+					} as unknown as vscode.LanguageModelChatInformation,
+					[{ role: vscode.LanguageModelChatMessageRole.User, content: [new vscode.LanguageModelTextPart("usage")], name: undefined }],
+					{} as unknown as vscode.LanguageModelChatRequestHandleOptions,
+					{ report: (p) => parts.push(p) },
+					new vscode.CancellationTokenSource().token
+				);
+				return { parts, body: JSON.parse(bodies[0]) as Record<string, unknown> };
+			} finally {
+				(global as unknown as Record<string, unknown>).fetch = originalFetch;
+			}
+		}
+
+		test("sends stream_options include_usage and reports a usage data part", async () => {
+			const DataPart = (vscode as unknown as Record<string, unknown>)["LanguageModelDataPart"] as
+				| (new (...args: unknown[]) => { data: Uint8Array; mimeType: string })
+				| undefined;
+			if (!DataPart) { return; } // older VS Code runtimes have no data parts
+
+			const { parts, body } = await runUsageRequest([
+				"data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n",
+				"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}\n\n",
+				"data: [DONE]\n\n",
+			]);
+
+			// The request body must ask for usage in the stream.
+			assert.deepEqual(body["stream_options"], { include_usage: true }, "must send stream_options.include_usage");
+
+			// A usage data part must be reported with the token counts.
+			const usagePart = parts.find((p) => p instanceof DataPart! && (p as InstanceType<typeof DataPart>).mimeType === "usage") as InstanceType<typeof DataPart> | undefined;
+			assert.ok(usagePart, "expected a usage data part");
+			assert.deepEqual(JSON.parse(new TextDecoder().decode(usagePart!.data)), {
+				prompt_tokens: 10,
+				completion_tokens: 5,
+				total_tokens: 15,
+			});
+		});
+
+		test("does not report a usage part when the server returns no token counts", async () => {
+			const DataPart = (vscode as unknown as Record<string, unknown>)["LanguageModelDataPart"] as
+				| (new (...args: unknown[]) => { mimeType: string })
+				| undefined;
+			if (!DataPart) { return; }
+
+			const { parts } = await runUsageRequest([
+				"data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n",
+				"data: {\"choices\":[],\"usage\":{}}\n\n",
+				"data: [DONE]\n\n",
+			]);
+
+			const usagePart = parts.find((p) => p instanceof DataPart! && (p as InstanceType<typeof DataPart>).mimeType === "usage");
+			assert.ok(!usagePart, "no usage part expected when counts are empty");
+		});
+	});
+
 	suite("utils/convertMessages", () => {
 		test("maps user/assistant text", () => {
 			const messages: vscode.LanguageModelChatMessage[] = [
