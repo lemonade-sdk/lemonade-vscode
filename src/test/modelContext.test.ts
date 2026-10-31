@@ -30,8 +30,8 @@ suite("Lemonade model context resolution", () => {
 					{ model_name: "running", recipe_options: { ctx_size: 32768 } },
 				] };
 			}
-			if (path === "/models/user%2Fmodel%20one/options") {return { resolved_ctx_size: 8192 };}
-			if (path === "/models/unset/options") {return { resolved_ctx_size: 24576 };}
+			if (path === "/models/user%2Fmodel%20one/options") { return { resolved_ctx_size: 8192 }; }
+			if (path === "/models/unset/options") { return { resolved_ctx_size: 24576 }; }
 			throw new Error(`Unexpected path ${path}`);
 		});
 
@@ -46,8 +46,8 @@ suite("Lemonade model context resolution", () => {
 			model("limited", { context_length: 4096 }),
 			model("legacy"),
 		], 128000, async (path) => {
-			if (path === "/health") {throw new Error("unavailable");}
-			if (path === "/models/auto/options") {return { resolved_ctx_size: -1 };}
+			if (path === "/health") { throw new Error("unavailable"); }
+			if (path === "/models/auto/options") { return { resolved_ctx_size: -1 }; }
 			throw new Error("404");
 		});
 
@@ -59,7 +59,7 @@ suite("Lemonade model context resolution", () => {
 		let peak = 0;
 		const models = Array.from({ length: 11 }, (_, n) => model(`m${n}`, { recipe_options: { ctx_size: -1 } }));
 		const result = await resolveModelContextLengths(models, 128000, async (path) => {
-			if (path === "/health") {return { all_models_loaded: [] };}
+			if (path === "/health") { return { all_models_loaded: [] }; }
 			inFlight++;
 			peak = Math.max(peak, inFlight);
 			await Promise.resolve();

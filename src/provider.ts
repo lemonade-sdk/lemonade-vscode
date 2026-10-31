@@ -9,7 +9,7 @@ import {
 	Progress,
 } from "vscode";
 
-import { convertTools, convertMessages, filterModels, findMissingModels, validateRequest } from "./utils";
+import { convertTools, convertMessages, filterModels, findMissingModels, isDataPart, isImageDataPart, validateRequest } from "./utils";
 import { ChatStreamParser } from "./streamParser";
 import type { LemonadeEndpoint, LemonadeModel, LemonadeModelsResponse } from "./types";
 import { resolveModelContextLengths } from "./modelContext";
@@ -57,6 +57,53 @@ function buildConfigurationSchema(levels: string[]) {
 }
 
 /**
+ * Determine if a model returned by the Lemonade HTTP API has vision/multimodal capabilities.
+ * Checks server-provided metadata, VS Code user settings, and model name patterns.
+ */
+export function isVisionModel(model: LemonadeModel | undefined): boolean {
+	if (!model || typeof model !== "object") {
+		return false;
+	}
+	try {
+		const config = vscode.workspace.getConfiguration("lemonade");
+		if (config.get<boolean>("enableVisionForAll") === true) {
+			return true;
+		}
+		const customVisionList = config.get<string[]>("visionModels");
+		if (Array.isArray(customVisionList)) {
+			const id = String(model.id || "");
+			if (customVisionList.some((item) => typeof item === "string" && (item === id || id.toLowerCase().includes(item.toLowerCase())))) {
+				return true;
+			}
+		}
+	} catch {
+		// Outside VS Code
+	}
+
+	// 1. Check metadata returned directly over HTTP by Lemonade server
+	if (Array.isArray(model.labels) && model.labels.some((l) => typeof l === "string" && /vision|image|multimodal|vlm/i.test(l))) {
+		return true;
+	}
+	if (model.mmproj || (model.checkpoints && model.checkpoints.mmproj)) {
+		return true;
+	}
+	if (Array.isArray(model.modalities) && model.modalities.some((m) => typeof m === "string" && /image|vision/i.test(m))) {
+		return true;
+	}
+	if (model.capabilities && ((model.capabilities as Record<string, unknown>).vision || (model.capabilities as Record<string, unknown>).imageInput)) {
+		return true;
+	}
+	if (model.vision === true || model.imageInput === true) {
+		return true;
+	}
+
+	// 2. Unambiguous name-based heuristics for vision models (e.g. llava, -vl, pixtral)
+	const modelId = String(model.id || "");
+	const visionPattern = /(?:^|[-_./])(?:vl|pixtral|llava)(?:$|[-_./])|qwen.*-vl/i;
+	return visionPattern.test(modelId);
+}
+
+/**
  * Resolve the context length to use. Reads LEMONADE_CTX_SIZE from the
  * environment; falls back to DEFAULT_CONTEXT_LENGTH when the variable is
  * absent or not a positive integer.
@@ -93,13 +140,21 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	 */
 	constructor(private readonly secrets: vscode.SecretStorage, private readonly userAgent: string) {}
 
-	/** Roughly estimate tokens for VS Code chat messages (text only) */
+	/** Roughly estimate tokens for VS Code chat messages */
 	private estimateMessagesTokens(msgs: readonly vscode.LanguageModelChatMessage[]): number {
 		let total = 0;
 		for (const m of msgs) {
 			for (const part of m.content) {
 				if (part instanceof vscode.LanguageModelTextPart) {
 					total += Math.ceil(part.value.length / 4);
+				} else if (isImageDataPart(part)) {
+					total += 1000;
+				} else if (isDataPart(part)) {
+					const mime = (part as { mimeType?: string; mime?: string }).mimeType || (part as { mimeType?: string; mime?: string }).mime;
+					if (mime !== "cache_control") {
+						const len = typeof part.data === "string" ? part.data.length : (part.data ? (part.data as { length?: number }).length ?? 0 : 0);
+						total += Math.ceil(len / 4);
+					}
 				}
 			}
 		}
@@ -173,6 +228,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 				const maxOutput = Math.min(DEFAULT_MAX_OUTPUT_TOKENS, Math.max(1, Math.floor(contextLength / 2)));
 				const maxInput = Math.max(1, contextLength - maxOutput);
 				const levels = resolveReasoningLevels(model.id, model.labels);
+				const isVision = isVisionModel(model);
 				const info = {
 					id,
 					// Only disambiguate with the endpoint name when several endpoints are listed together.
@@ -184,7 +240,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 					maxOutputTokens: maxOutput,
 					capabilities: {
 						toolCalling: true,
-						imageInput: false,
+						imageInput: isVision,
 					},
 					// Proposed API (chatProvider): renders a reasoning picker in the model menu.
 					...(levels ? { configurationSchema: buildConfigurationSchema(levels) } : {}),
@@ -481,6 +537,14 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			for (const part of text.content) {
 				if (part instanceof vscode.LanguageModelTextPart) {
 					totalTokens += Math.ceil(part.value.length / 4);
+				} else if (isImageDataPart(part)) {
+					totalTokens += 1000;
+				} else if (isDataPart(part)) {
+					const mime = (part as { mimeType?: string; mime?: string }).mimeType || (part as { mimeType?: string; mime?: string }).mime;
+					if (mime !== "cache_control") {
+						const len = typeof part.data === "string" ? part.data.length : (part.data ? (part.data as { length?: number }).length ?? 0 : 0);
+						totalTokens += Math.ceil(len / 4);
+					}
 				}
 			}
 			return totalTokens;
