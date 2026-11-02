@@ -385,6 +385,10 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
                 model: realModelId,
                 messages: openaiMessages,
                 stream: true,
+                // Ask the server to include token usage in the final streamed
+                // chunk. Without this, OpenAI-compatible endpoints omit `usage`
+                // from the stream, so VS Code has no token stats to display.
+                stream_options: { include_usage: true },
                 max_tokens: requestedTokens ? Math.min(requestedTokens, maxOutputTokens) : maxOutputTokens,
                 temperature: options.modelOptions?.temperature ?? 0.7,
             };
@@ -444,7 +448,15 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			if (!response.body) {
 				throw new Error("No response body from Lemonade API");
 			}
-			await new ChatStreamParser().processStreamingResponse(response.body, trackingProgress, token);
+			const parser = new ChatStreamParser();
+			await parser.processStreamingResponse(response.body, trackingProgress, token);
+			// Only report usage when the server actually returned token counts.
+			// VS Code reads `prompt_tokens`/`completion_tokens` (snake_case) from
+			// a 'usage' data part to render token stats under the response.
+			const usagePart = this.buildUsagePart(parser.usage);
+			if (usagePart) {
+				trackingProgress.report(usagePart);
+			}
 		} catch (err) {
 			if (token.isCancellationRequested && abortController.signal.aborted) {
 				return;
@@ -485,6 +497,30 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 			}
 			return totalTokens;
 		}
+	}
+
+	/**
+	 * Build a 'usage' data part from a streamed usage payload, or undefined
+	 * when there are no real token counts. OpenAI-compatible servers report
+	 * `prompt_tokens` and `completion_tokens` (snake_case); VS Code reads these
+	 * exact fields from a `usage`-mimeType data part to render token stats.
+	 */
+	private buildUsagePart(usage: Record<string, unknown>): LanguageModelResponsePart | undefined {
+		const prompt = usage["prompt_tokens"];
+		const completion = usage["completion_tokens"];
+		const hasPrompt = typeof prompt === "number" && prompt > 0;
+		const hasCompletion = typeof completion === "number" && completion > 0;
+		if (!hasPrompt && !hasCompletion) {
+			return undefined;
+		}
+		// LanguageModelDataPart is newer than the vendored vscode.d.ts; resolve it at runtime.
+		const DataPartCtor = (vscode as unknown as Record<string, unknown>)["LanguageModelDataPart"] as
+			| (new (data: Uint8Array, mimeType: string) => LanguageModelResponsePart)
+			| undefined;
+		if (!DataPartCtor) {
+			return undefined;
+		}
+		return new DataPartCtor(new TextEncoder().encode(JSON.stringify(usage)), "usage");
 	}
 
 	/** Strip provider control tokens like <|tool_calls_section_begin|> and <|tool_call_begin|> from streamed text. */

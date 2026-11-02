@@ -38,6 +38,13 @@ export class ChatStreamParser {
 	private _controlTokenBuffer = "";
 
 	/**
+	 * Token usage captured from the stream (typically the final chunk before
+	 * [DONE], which carries `usage` and empty choices). Empty when the server
+	 * did not report usage.
+	 */
+	readonly usage: Record<string, unknown> = {};
+
+	/**
 	 * Read and parse the Lemonade server streaming (SSE-like) response and report parts.
 	 * @param responseBody The readable stream body.
 	 * @param progress Progress reporter for streamed parts.
@@ -98,6 +105,12 @@ export class ChatStreamParser {
         progress: vscode.Progress<vscode.LanguageModelResponsePart>,
     ): Promise<boolean> {
         let emitted = false;
+        // Extract usage data from the response chunk (typically in the last chunk
+        // before [DONE], which carries `usage` with an empty `choices` array).
+        const usage = (delta.usage as Record<string, unknown> | undefined);
+        if (usage && typeof usage === "object") {
+            Object.assign(this.usage, usage);
+        }
         const choice = (delta.choices as Record<string, unknown>[] | undefined)?.[0];
         if (!choice) { return false; }
 
