@@ -12,7 +12,7 @@ suite("Lemonade model context resolution", () => {
 			model("configured", { recipe_options: { ctx_size: 32768 }, context_length: 24576 }),
 			model("old", { recipe_options: { ctx_size: 64000 } }),
 			model("cloud", { recipe: "cloud", context_length: 131072 }),
-		], 128000, async () => { throw new Error("Unexpected extra request"); });
+		], async () => { throw new Error("Unexpected extra request"); });
 
 		assert.deepStrictEqual(result, [24576, 64000, 131072]);
 	});
@@ -23,7 +23,7 @@ suite("Lemonade model context resolution", () => {
 			model("running", { recipe_options: { ctx_size: -1 }, context_length: 262144 }),
 			model("user/model one", { recipe_options: { ctx_size: -1 }, context_length: 262144 }),
 			model("unset", { context_length: 65536 }),
-		], 128000, async (path) => {
+		], async (path) => {
 			requested.push(path);
 			if (path === "/health") {
 				return { all_models_loaded: [
@@ -40,25 +40,25 @@ suite("Lemonade model context resolution", () => {
 		assert.ok(!requested.includes("/models/running/options"));
 	});
 
-	test("failed or unavailable options retain the fallback without trusting a theoretical maximum", async () => {
+	test("failed or unavailable options fall back to reported context or zero", async () => {
 		const result = await resolveModelContextLengths([
 			model("auto", { recipe_options: { ctx_size: -1 }, context_length: 262144 }),
 			model("limited", { context_length: 4096 }),
 			model("legacy"),
-		], 128000, async (path) => {
+		], async (path) => {
 			if (path === "/health") {throw new Error("unavailable");}
 			if (path === "/models/auto/options") {return { resolved_ctx_size: -1 };}
 			throw new Error("404");
 		});
 
-		assert.deepStrictEqual(result, [128000, 4096, 128000]);
+		assert.deepStrictEqual(result, [262144, 4096, 0]);
 	});
 
 	test("bounds concurrent auto-size probes", async () => {
 		let inFlight = 0;
 		let peak = 0;
 		const models = Array.from({ length: 11 }, (_, n) => model(`m${n}`, { recipe_options: { ctx_size: -1 } }));
-		const result = await resolveModelContextLengths(models, 128000, async (path) => {
+		const result = await resolveModelContextLengths(models, async (path) => {
 			if (path === "/health") {return { all_models_loaded: [] };}
 			inFlight++;
 			peak = Math.max(peak, inFlight);
