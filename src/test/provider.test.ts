@@ -306,7 +306,7 @@ suite("Lemonade Chat Provider Extension", () => {
 			}
 		});
 
-		test("provideLanguageModelChatResponse reports reasoning_content as thinking", async function () {
+		test("provideLanguageModelChatResponse keeps thinking IDs stable across deltas", async function () {
 			const ThinkingPart = (vscode as unknown as Record<string, unknown>)["LanguageModelThinkingPart"] as
 				| (new (...args: unknown[]) => object)
 				| undefined;
@@ -321,8 +321,11 @@ suite("Lemonade Chat Provider Extension", () => {
 					ok: true,
 					body: new ReadableStream<Uint8Array>({
 						start(controller) {
-							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"pondering\"}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":{\"text\":\"pondering\",\"id\":\"chunk-1\"}}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":{\"text\":\"\",\"id\":\"empty-marker\"}}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":{\"text\":\" more\",\"id\":\"chunk-2\"}}}]}\n\n"));
 							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"content\":\"answer\"}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":{\"text\":\"later\",\"id\":\"chunk-3\"}}}]}\n\n"));
 							controller.enqueue(encoder.encode("data: [DONE]\n\n"));
 							controller.close();
 						},
@@ -353,9 +356,73 @@ suite("Lemonade Chat Provider Extension", () => {
 					new vscode.CancellationTokenSource().token
 				);
 
-				assert.ok(parts[0] instanceof ThinkingPart!, "reasoning_content should be reported as a thinking part");
-				assert.ok(parts[1] instanceof vscode.LanguageModelTextPart);
-				assert.equal((parts[1] as vscode.LanguageModelTextPart).value, "answer");
+				const thinkingParts = parts.filter((part) => part instanceof ThinkingPart!) as Array<Record<string, unknown>>;
+				assert.equal(thinkingParts.length, 3);
+				assert.deepEqual(thinkingParts.map((part) => part["id"]), ["chunk-1", "chunk-1", "chunk-3"]);
+				assert.deepEqual(thinkingParts.map((part) => part["value"]), ["pondering", " more", "later"]);
+				const answer = parts.find((part) => part instanceof vscode.LanguageModelTextPart) as vscode.LanguageModelTextPart | undefined;
+				assert.ok(answer);
+				assert.equal(answer.value, "answer");
+			} finally {
+				(global as unknown as Record<string, unknown>).fetch = originalFetch;
+			}
+		});
+
+		test("provideLanguageModelChatResponse assigns stable IDs to string reasoning deltas", async function () {
+			const ThinkingPart = (vscode as unknown as Record<string, unknown>)["LanguageModelThinkingPart"] as
+				| (new (...args: unknown[]) => object)
+				| undefined;
+			if (!ThinkingPart) {
+				this.skip();
+			}
+
+			const originalFetch = global.fetch;
+			try {
+				const encoder = new TextEncoder();
+				(global as unknown as Record<string, unknown>).fetch = async () => ({
+					ok: true,
+					body: new ReadableStream<Uint8Array>({
+						start(controller) {
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"pondering\"}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\" more\"}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"content\":\"answer\"}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"later\"}}]}\n\n"));
+							controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+							controller.close();
+						},
+					}),
+				});
+
+				const provider = new LemonadeChatModelProvider({
+					get: async () => undefined,
+					store: async () => {},
+					delete: async () => {},
+					onDidChange: (_listener: unknown) => ({ dispose() {} }),
+				} as unknown as vscode.SecretStorage, "test/test");
+
+				const parts: unknown[] = [];
+				await provider.provideLanguageModelChatResponse(
+					{
+						id: "m",
+						name: "m",
+						family: "lemonade",
+						version: "1.0.0",
+						maxInputTokens: 1000,
+						maxOutputTokens: 1000,
+						capabilities: {},
+					} as unknown as vscode.LanguageModelChatInformation,
+					[{ role: vscode.LanguageModelChatMessageRole.User, content: [new vscode.LanguageModelTextPart("hi")], name: undefined }],
+					{} as unknown as vscode.LanguageModelChatRequestHandleOptions,
+					{ report: (part) => parts.push(part) },
+					new vscode.CancellationTokenSource().token
+				);
+
+				const thinkingParts = parts.filter((part) => part instanceof ThinkingPart!) as Array<Record<string, unknown>>;
+				assert.equal(thinkingParts.length, 3);
+				const [first, second, third] = thinkingParts.map((part) => part["id"]);
+				assert.ok(typeof first === "string" && first.length > 0);
+				assert.equal(second, first);
+				assert.notEqual(third, first);
 			} finally {
 				(global as unknown as Record<string, unknown>).fetch = originalFetch;
 			}
