@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import * as vscode from "vscode";
 import { tryParseJSONObject } from "./utils";
 
@@ -38,7 +39,6 @@ export class ChatStreamParser {
 	private _controlTokenBuffer = "";
     private _thinkingSequenceId: string | undefined;
     private _thinkingSequenceActive = false;
-    private _thinkingSequenceCounter = 0;
 
 	/**
 	 * Token usage captured from the stream (typically the final chunk before
@@ -144,7 +144,7 @@ export class ChatStreamParser {
                         }
                         if (text) {
                             if (!this._thinkingSequenceActive) {
-                                this._thinkingSequenceId = id || `lemonade-thinking-${this._thinkingSequenceCounter++}`;
+                                this._thinkingSequenceId = id || `lemonade-thinking-${randomUUID()}`;
                                 this._thinkingSequenceActive = true;
                             }
                             progress.report(new (ThinkingCtor as new (text: string, id?: string, metadata?: unknown) => unknown)(text, this._thinkingSequenceId, metadata) as unknown as vscode.LanguageModelResponsePart);

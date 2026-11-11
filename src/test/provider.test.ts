@@ -400,29 +400,37 @@ suite("Lemonade Chat Provider Extension", () => {
 					onDidChange: (_listener: unknown) => ({ dispose() {} }),
 				} as unknown as vscode.SecretStorage, "test/test");
 
-				const parts: unknown[] = [];
-				await provider.provideLanguageModelChatResponse(
-					{
-						id: "m",
-						name: "m",
-						family: "lemonade",
-						version: "1.0.0",
-						maxInputTokens: 1000,
-						maxOutputTokens: 1000,
-						capabilities: {},
-					} as unknown as vscode.LanguageModelChatInformation,
-					[{ role: vscode.LanguageModelChatMessageRole.User, content: [new vscode.LanguageModelTextPart("hi")], name: undefined }],
-					{} as unknown as vscode.LanguageModelChatRequestHandleOptions,
-					{ report: (part) => parts.push(part) },
-					new vscode.CancellationTokenSource().token
-				);
+				const runRequest = async (): Promise<unknown[]> => {
+					const parts: unknown[] = [];
+					await provider.provideLanguageModelChatResponse(
+						{
+							id: "m",
+							name: "m",
+							family: "lemonade",
+							version: "1.0.0",
+							maxInputTokens: 1000,
+							maxOutputTokens: 1000,
+							capabilities: {},
+						} as unknown as vscode.LanguageModelChatInformation,
+						[{ role: vscode.LanguageModelChatMessageRole.User, content: [new vscode.LanguageModelTextPart("hi")], name: undefined }],
+						{} as unknown as vscode.LanguageModelChatRequestHandleOptions,
+						{ report: (part) => parts.push(part) },
+						new vscode.CancellationTokenSource().token
+					);
+					return parts.filter((part) => part instanceof ThinkingPart!);
+				};
 
-				const thinkingParts = parts.filter((part) => part instanceof ThinkingPart!) as Array<Record<string, unknown>>;
+				const thinkingParts = await runRequest() as Array<Record<string, unknown>>;
 				assert.equal(thinkingParts.length, 3);
 				const [first, second, third] = thinkingParts.map((part) => part["id"]);
 				assert.ok(typeof first === "string" && first.length > 0);
 				assert.equal(second, first);
 				assert.notEqual(third, first);
+
+				// IDs must not repeat across requests (e.g. agent-mode tool-call rounds within one turn).
+				const nextRequestParts = await runRequest() as Array<Record<string, unknown>>;
+				assert.notEqual(nextRequestParts[0]["id"], first);
+				assert.notEqual(nextRequestParts[0]["id"], third);
 			} finally {
 				(global as unknown as Record<string, unknown>).fetch = originalFetch;
 			}
