@@ -58,10 +58,9 @@ function buildConfigurationSchema(levels: string[]) {
 
 /**
  * Resolve the context length to use. Reads LEMONADE_CTX_SIZE from the
- * environment; falls back to DEFAULT_CONTEXT_LENGTH when the variable is
- * absent or not a positive integer.
+ * environment; otherwise returns the model context length provided.
  */
-function resolveContextLength(): number {
+function resolveContextLength(modelContextLength: number): number {
 	const raw = process.env["LEMONADE_CTX_SIZE"];
 	if (raw) {
 		const parsed = parseInt(raw, 10);
@@ -69,7 +68,7 @@ function resolveContextLength(): number {
 			return parsed;
 		}
 	}
-	return DEFAULT_CONTEXT_LENGTH;
+	return modelContextLength;
 }
 
 /**
@@ -128,7 +127,6 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	): Promise<LanguageModelChatInformation[]> {
 		const groupEndpoint = this.endpointFromConfiguration(options.group, options.configuration);
 		const endpoints = groupEndpoint ? [groupEndpoint] : await this.getEndpoints({ includeDefault: false });
-		const fallbackContextLength = resolveContextLength();
 
 		// Fetch models from all endpoints concurrently; ignore per-endpoint errors
 		const results = await Promise.all(
@@ -144,7 +142,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 					const allowListMismatch = models.length === 0 && serverModels.length > 0 ? missing : undefined;
 					const contextSignal = AbortSignal.timeout(2500);
 					const contextLengths = await resolveModelContextLengths(
-						models, fallbackContextLength, async (path) => {
+						models, async (path) => {
 							const response = await fetch(`${ep.url}${path}`, {
 								method: "GET",
 								headers: {
@@ -166,12 +164,17 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		const infos: LanguageModelChatInformation[] = [];
 		for (const { ep, models, contextLengths } of results) {
 			for (const [index, model] of models.entries()) {
+				// Preserve a usable input budget even when auto-tuning selects a small context.
+				const contextLength = resolveContextLength(contextLengths[index]);
+				let maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
+				let maxInput = DEFAULT_CONTEXT_LENGTH - DEFAULT_MAX_OUTPUT_TOKENS;
+				if (Number.isFinite(contextLength) && contextLength > 0) {
+					maxOutput = Math.trunc(contextLength / 2);
+					maxInput = Math.max(1, contextLength - maxOutput);
+				}
+
 				// Group-configured endpoints are resolved via _endpointByModel, so the raw id is used.
 				const id = groupEndpoint ? model.id : `${ep.shortname}/${model.id}`;
-				const contextLength = contextLengths[index];
-				// Preserve a usable input budget even when auto-tuning selects a small context.
-				const maxOutput = Math.min(DEFAULT_MAX_OUTPUT_TOKENS, Math.max(1, Math.floor(contextLength / 2)));
-				const maxInput = Math.max(1, contextLength - maxOutput);
 				const levels = resolveReasoningLevels(model.id, model.labels);
 				const info = {
 					id,
