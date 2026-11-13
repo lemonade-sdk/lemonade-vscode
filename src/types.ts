@@ -16,11 +16,35 @@ export interface OpenAIFunctionToolDef {
 }
 
 /**
+ * OpenAI text content part for multimodal chat messages.
+ */
+export interface OpenAITextContentPart {
+	type: "text";
+	text: string;
+}
+
+/**
+ * OpenAI image content part for multimodal chat messages.
+ */
+export interface OpenAIImageContentPart {
+	type: "image_url";
+	image_url: {
+		url: string;
+		detail?: "auto" | "low" | "high";
+	};
+}
+
+/**
+ * Supported message content part types in OpenAI-compatible multimodal requests.
+ */
+export type OpenAIMessageContentPart = OpenAITextContentPart | OpenAIImageContentPart;
+
+/**
  * OpenAI-style chat message used for Lemonade server requests.
  */
 export interface OpenAIChatMessage {
 	role: OpenAIChatRole;
-	content?: string;
+	content?: string | OpenAIMessageContentPart[];
 	name?: string;
 	tool_calls?: OpenAIToolCall[];
 	tool_call_id?: string;
@@ -59,6 +83,12 @@ export interface LemonadeModel {
 		ctx_size?: number;
 	};
 	labels?: string[];
+	mmproj?: string;
+	modalities?: string[];
+	capabilities?: Record<string, unknown>;
+	vision?: boolean;
+	imageInput?: boolean;
+	checkpoints?: { mmproj?: string };
 }
 
 /**

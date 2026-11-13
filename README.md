@@ -60,6 +60,13 @@ Names must match the server's model ids exactly. If none of them match, a warnin
 |---|---|---|
 | `LEMONADE_CTX_SIZE` | `128000` | Fallback context window (in tokens) for older Lemonade servers or models whose effective context cannot be resolved. Current servers use per-model context settings and runtime/auto-tuned sizes when available. |
 
+### VS Code Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `lemonade.enableVisionForAll` | `false` | Force-enable vision/image support for all models from the Lemonade server. |
+| `lemonade.visionModels` | `[]` | List of model IDs or substring names to explicitly enable vision/image support for (e.g. `["qwen-vl", "llava"]`). |
+
 > **Tip:** For older servers, launch VS Code with `LEMONADE_CTX_SIZE` set to the actual context limit. Current Lemonade servers normally determine this per model automatically.
 
 ## Support & License

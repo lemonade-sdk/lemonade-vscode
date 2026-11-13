@@ -95,7 +95,25 @@
 				"command": "lemonade.toggleEphemeralFilter",
 				"title": "Toggle Lemonade filter ephemeral data"
 			}
-		]
+		],
+		"configuration": {
+			"title": "Lemonade",
+			"properties": {
+				"lemonade.enableVisionForAll": {
+					"type": "boolean",
+					"default": false,
+					"description": "Force-enable vision/image support for all models from the Lemonade server."
+				},
+				"lemonade.visionModels": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "List of model IDs or substring names to explicitly enable vision/image support for."
+				}
+			}
+		}
 	},
 	"main": "./out/extension.js",
 	"scripts": {
