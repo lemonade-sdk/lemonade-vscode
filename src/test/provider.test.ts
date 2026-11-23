@@ -272,6 +272,56 @@ suite("Lemonade Chat Provider Extension", () => {
 			}
 		});
 
+		test("prepareLanguageModelChatInformation applies LEMONADE_CTX_SIZE only to unresolved contexts", async () => {
+			const endpoints: LemonadeEndpoint[] = [
+				{ shortname: "node", url: "http://localhost:13305/api/v1" },
+			];
+			const originalFetch = global.fetch;
+			const originalCtx = process.env["LEMONADE_CTX_SIZE"];
+			try {
+				process.env["LEMONADE_CTX_SIZE"] = "32768";
+				(global as unknown as Record<string, unknown>).fetch = async (url: string) => ({
+					ok: url.endsWith("/models"),
+					json: async () => ({
+						object: "list",
+						data: [
+							{ id: "configured", object: "model", recipe_options: { ctx_size: 8192 } },
+							{ id: "auto", object: "model", recipe_options: { ctx_size: -1 }, context_length: 262144 },
+							{ id: "cloud", object: "model", recipe: "cloud" },
+						],
+					}),
+				});
+
+				const provider = new LemonadeChatModelProvider({
+					get: async (k: string) => k === "lemonade.endpoints" ? JSON.stringify(endpoints) : undefined,
+					store: async () => {},
+					delete: async () => {},
+					onDidChange: (_listener: unknown) => ({ dispose() {} }),
+				} as unknown as vscode.SecretStorage, "test/test");
+
+				const infos = await provider.prepareLanguageModelChatInformation(
+					{ silent: true },
+					new vscode.CancellationTokenSource().token
+				);
+				const byId = Object.fromEntries(infos.map((i) => [i.id, i]));
+
+				assert.equal(byId["node/configured"].maxOutputTokens, 4096);
+				assert.equal(byId["node/configured"].maxInputTokens, 4096);
+
+				for (const id of ["node/auto", "node/cloud"]) {
+					assert.equal(byId[id].maxOutputTokens, 16384);
+					assert.equal(byId[id].maxInputTokens, 16384);
+				}
+			} finally {
+				(global as unknown as Record<string, unknown>).fetch = originalFetch;
+				if (originalCtx === undefined) {
+					delete process.env["LEMONADE_CTX_SIZE"];
+				} else {
+					process.env["LEMONADE_CTX_SIZE"] = originalCtx;
+				}
+			}
+		});
+
 		test("prepareLanguageModelChatInformation keeps input capacity for an auto-tuned small context", async () => {
 			const originalFetch = global.fetch;
 			const endpoints: LemonadeEndpoint[] = [

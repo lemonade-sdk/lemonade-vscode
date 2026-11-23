@@ -58,10 +58,11 @@ function buildConfigurationSchema(levels: string[]) {
 }
 
 /**
- * Resolve the context length to use. Reads LEMONADE_CTX_SIZE from the
- * environment; otherwise returns the model context length provided.
+ * Read the fallback context length from LEMONADE_CTX_SIZE. Returns undefined
+ * when the variable is absent or not a positive integer. Only applies to models
+ * whose effective context cannot be resolved; it never overrides a known context.
  */
-function resolveContextLength(modelContextLength: number): number {
+function resolveFallbackContextLength(): number | undefined {
 	const raw = process.env["LEMONADE_CTX_SIZE"];
 	if (raw) {
 		const parsed = parseInt(raw, 10);
@@ -69,7 +70,7 @@ function resolveContextLength(modelContextLength: number): number {
 			return parsed;
 		}
 	}
-	return modelContextLength;
+	return undefined;
 }
 
 /**
@@ -128,6 +129,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	): Promise<LanguageModelChatInformation[]> {
 		const groupEndpoint = this.endpointFromConfiguration(options.group, options.configuration);
 		const endpoints = groupEndpoint ? [groupEndpoint] : await this.getEndpoints({ includeDefault: false });
+		const fallbackContextLength = resolveFallbackContextLength();
 
 		// Fetch models from all endpoints concurrently; ignore per-endpoint errors
 		const results = await Promise.all(
@@ -143,7 +145,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 					const allowListMismatch = models.length === 0 && serverModels.length > 0 ? missing : undefined;
 					const contextSignal = AbortSignal.timeout(2500);
 					const contextLengths = await resolveModelContextLengths(
-						models, DEFAULT_CONTEXT_LENGTH, async (path) => {
+						models, fallbackContextLength ?? DEFAULT_CONTEXT_LENGTH, async (path) => {
 							const response = await fetch(`${ep.url}${path}`, {
 								method: "GET",
 								headers: {
@@ -165,8 +167,8 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		const infos: LanguageModelChatInformation[] = [];
 		for (const { ep, models, contextLengths } of results) {
 			for (const [index, model] of models.entries()) {
+				const contextLength = contextLengths[index] || fallbackContextLength || 0;
 				// Preserve a usable input budget even when auto-tuning selects a small context.
-				const contextLength = resolveContextLength(contextLengths[index]);
 				let maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
 				let maxInput = DEFAULT_CONTEXT_LENGTH - DEFAULT_MAX_OUTPUT_TOKENS;
 				if (Number.isFinite(contextLength) && contextLength > 0) {
