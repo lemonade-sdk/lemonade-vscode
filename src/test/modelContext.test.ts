@@ -40,7 +40,7 @@ suite("Lemonade model context resolution", () => {
 		assert.ok(!requested.includes("/models/running/options"));
 	});
 
-	test("failed or unavailable options retain the fallback without trusting a theoretical maximum", async () => {
+	test("failed or unavailable options cap reported context at the unresolved limit", async () => {
 		const result = await resolveModelContextLengths([
 			model("auto", { recipe_options: { ctx_size: -1 }, context_length: 262144 }),
 			model("limited", { context_length: 4096 }),

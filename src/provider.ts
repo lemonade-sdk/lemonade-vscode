@@ -16,6 +16,7 @@ import { resolveModelContextLengths } from "./modelContext";
 
 const DEFAULT_BASE_URL = "http://localhost:13305/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
+const DEFAULT_MAX_OUTPUT_TOKENS_LIMIT = 64000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_API_KEY = "lemonade";
 const ENDPOINTS_SECRET_KEY = "lemonade.endpoints";
@@ -57,11 +58,11 @@ function buildConfigurationSchema(levels: string[]) {
 }
 
 /**
- * Resolve the context length to use. Reads LEMONADE_CTX_SIZE from the
- * environment; falls back to DEFAULT_CONTEXT_LENGTH when the variable is
- * absent or not a positive integer.
+ * Read the fallback context length from LEMONADE_CTX_SIZE. Returns undefined
+ * when the variable is absent or not a positive integer. Only applies to models
+ * whose effective context cannot be resolved; it never overrides a known context.
  */
-function resolveContextLength(): number {
+function resolveFallbackContextLength(): number | undefined {
 	const raw = process.env["LEMONADE_CTX_SIZE"];
 	if (raw) {
 		const parsed = parseInt(raw, 10);
@@ -69,7 +70,7 @@ function resolveContextLength(): number {
 			return parsed;
 		}
 	}
-	return DEFAULT_CONTEXT_LENGTH;
+	return undefined;
 }
 
 /**
@@ -128,7 +129,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 	): Promise<LanguageModelChatInformation[]> {
 		const groupEndpoint = this.endpointFromConfiguration(options.group, options.configuration);
 		const endpoints = groupEndpoint ? [groupEndpoint] : await this.getEndpoints({ includeDefault: false });
-		const fallbackContextLength = resolveContextLength();
+		const fallbackContextLength = resolveFallbackContextLength();
 
 		// Fetch models from all endpoints concurrently; ignore per-endpoint errors
 		const results = await Promise.all(
@@ -144,7 +145,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 					const allowListMismatch = models.length === 0 && serverModels.length > 0 ? missing : undefined;
 					const contextSignal = AbortSignal.timeout(2500);
 					const contextLengths = await resolveModelContextLengths(
-						models, fallbackContextLength, async (path) => {
+						models, fallbackContextLength ?? DEFAULT_CONTEXT_LENGTH, async (path) => {
 							const response = await fetch(`${ep.url}${path}`, {
 								method: "GET",
 								headers: {
@@ -166,12 +167,17 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 		const infos: LanguageModelChatInformation[] = [];
 		for (const { ep, models, contextLengths } of results) {
 			for (const [index, model] of models.entries()) {
+				const contextLength = contextLengths[index] || fallbackContextLength || 0;
+				// Preserve a usable input budget even when auto-tuning selects a small context.
+				let maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
+				let maxInput = DEFAULT_CONTEXT_LENGTH - DEFAULT_MAX_OUTPUT_TOKENS;
+				if (Number.isFinite(contextLength) && contextLength > 0) {
+					maxOutput = Math.min(Math.trunc(contextLength / 2), DEFAULT_MAX_OUTPUT_TOKENS_LIMIT);
+					maxInput = Math.max(1, contextLength - maxOutput);
+				}
+
 				// Group-configured endpoints are resolved via _endpointByModel, so the raw id is used.
 				const id = groupEndpoint ? model.id : `${ep.shortname}/${model.id}`;
-				const contextLength = contextLengths[index];
-				// Preserve a usable input budget even when auto-tuning selects a small context.
-				const maxOutput = Math.min(DEFAULT_MAX_OUTPUT_TOKENS, Math.max(1, Math.floor(contextLength / 2)));
-				const maxInput = Math.max(1, contextLength - maxOutput);
 				const levels = resolveReasoningLevels(model.id, model.labels);
 				const info = {
 					id,

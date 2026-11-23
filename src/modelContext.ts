@@ -12,10 +12,12 @@ function positiveContextLength(value: unknown): number | undefined {
  * Resolve the context budget VS Code should advertise for each model.
  * /models.context_length describes the loaded context or a configured context,
  * but for unloaded auto-tuned models it can be only the model's theoretical max.
+ * When auto-size resolution fails, caps the reported length at the unresolved limit.
+ * If nothing is known about a model's context size, zero is returned.
  */
 export async function resolveModelContextLengths(
 	models: readonly LemonadeModel[],
-	fallbackContextLength: number,
+	maxUnresolvedContextLength: number,
 	fetchJson: (path: string) => Promise<unknown>
 ): Promise<number[]> {
 	const needsResolution = (model: LemonadeModel) =>
@@ -24,7 +26,7 @@ export async function resolveModelContextLengths(
 	if (!models.some(needsResolution)) {
 		return models.map((model) =>
 			positiveContextLength(model.context_length) ??
-			positiveContextLength(model.recipe_options?.ctx_size) ?? fallbackContextLength
+			positiveContextLength(model.recipe_options?.ctx_size) ?? 0
 		);
 	}
 
@@ -71,14 +73,14 @@ export async function resolveModelContextLengths(
 		const reported = positiveContextLength(model.context_length);
 		const configured = positiveContextLength(model.recipe_options?.ctx_size);
 		if (!needsResolution(model)) {
-			return reported ?? configured ?? fallbackContextLength;
+			return reported ?? configured ?? 0;
 		}
 		// Loaded runtime context and a successfully resolved auto-size are authoritative.
 		const resolved = loadedContexts.get(model.id) ?? resolvedContexts.get(model.id);
 		if (resolved !== undefined) {
 			return resolved;
 		}
-		// Older servers: preserve the env fallback, but never exceed a known model limit.
-		return Math.min(reported ?? fallbackContextLength, fallbackContextLength);
+		// Older servers may report a theoretical maximum for unresolved auto-sized models.
+		return Math.min(reported ?? maxUnresolvedContextLength, maxUnresolvedContextLength);
 	});
 }
