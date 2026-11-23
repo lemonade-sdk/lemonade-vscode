@@ -252,15 +252,15 @@ suite("Lemonade Chat Provider Extension", () => {
 				);
 				const byId = Object.fromEntries(infos.map((i) => [i.id, i]));
 
-				assert.equal(byId["node/big"].maxOutputTokens, 100000);
-				assert.equal(byId["node/big"].maxInputTokens, 100000);
+				assert.equal(byId["node/big"].maxOutputTokens, 64000);
+				assert.equal(byId["node/big"].maxInputTokens, 136000);
 
 				assert.equal(byId["node/small"].maxOutputTokens, 16384);
 				assert.equal(byId["node/small"].maxInputTokens, 16384);
 
 				for (const id of ["node/invalid", "node/none"]) {
-					assert.equal(byId[id].maxOutputTokens, 16000);
-					assert.equal(byId[id].maxInputTokens, 112000);
+					assert.equal(byId[id].maxOutputTokens, 64000);
+					assert.equal(byId[id].maxInputTokens, 64000);
 				}
 			} finally {
 				(global as unknown as Record<string, unknown>).fetch = originalFetch;

@@ -12,10 +12,12 @@ function positiveContextLength(value: unknown): number | undefined {
  * Resolve the context budget VS Code should advertise for each model.
  * /models.context_length describes the loaded context or a configured context,
  * but for unloaded auto-tuned models it can be only the model's theoretical max.
- * Returns zero as a fallback for models that cannot be resolved.
+ * When auto-size resolution fails, caps the reported length at the unresolved limit.
+ * If nothing is known about a model's context size, zero is returned.
  */
 export async function resolveModelContextLengths(
 	models: readonly LemonadeModel[],
+	maxUnresolvedContextLength: number,
 	fetchJson: (path: string) => Promise<unknown>
 ): Promise<number[]> {
 	const needsResolution = (model: LemonadeModel) =>
@@ -78,7 +80,7 @@ export async function resolveModelContextLengths(
 		if (resolved !== undefined) {
 			return resolved;
 		}
-		// Older servers: preserve the env fallback, but never exceed a known model limit.
-		return reported ?? 0;
+		// Older servers may report a theoretical maximum for unresolved auto-sized models.
+		return Math.min(reported ?? maxUnresolvedContextLength, maxUnresolvedContextLength);
 	});
 }

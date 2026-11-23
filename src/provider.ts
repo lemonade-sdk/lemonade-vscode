@@ -16,6 +16,7 @@ import { resolveModelContextLengths } from "./modelContext";
 
 const DEFAULT_BASE_URL = "http://localhost:13305/api/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
+const DEFAULT_MAX_OUTPUT_TOKENS_LIMIT = 64000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 const DEFAULT_API_KEY = "lemonade";
 const ENDPOINTS_SECRET_KEY = "lemonade.endpoints";
@@ -142,7 +143,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 					const allowListMismatch = models.length === 0 && serverModels.length > 0 ? missing : undefined;
 					const contextSignal = AbortSignal.timeout(2500);
 					const contextLengths = await resolveModelContextLengths(
-						models, async (path) => {
+						models, DEFAULT_CONTEXT_LENGTH, async (path) => {
 							const response = await fetch(`${ep.url}${path}`, {
 								method: "GET",
 								headers: {
@@ -169,7 +170,7 @@ export class LemonadeChatModelProvider implements LanguageModelChatProvider {
 				let maxOutput = DEFAULT_MAX_OUTPUT_TOKENS;
 				let maxInput = DEFAULT_CONTEXT_LENGTH - DEFAULT_MAX_OUTPUT_TOKENS;
 				if (Number.isFinite(contextLength) && contextLength > 0) {
-					maxOutput = Math.trunc(contextLength / 2);
+					maxOutput = Math.min(Math.trunc(contextLength / 2), DEFAULT_MAX_OUTPUT_TOKENS_LIMIT);
 					maxInput = Math.max(1, contextLength - maxOutput);
 				}
 
